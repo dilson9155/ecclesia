@@ -21,6 +21,8 @@ const PERMISSIONS: Array<{ key: string; name: string; group: string }> = [
   { key: "congregacoes.create", name: "Criar congregações", group: "Congregações" },
   { key: "congregacoes.edit", name: "Editar congregações", group: "Congregações" },
   { key: "congregacoes.delete", name: "Excluir congregações", group: "Congregações" },
+  { key: "sedes.view", name: "Visualizar sedes", group: "Sedes" },
+  { key: "sedes.manage", name: "Gerenciar sedes", group: "Sedes" },
   { key: "membros.view", name: "Visualizar membros", group: "Membros" },
   { key: "membros.create", name: "Criar membros", group: "Membros" },
   { key: "membros.edit", name: "Editar membros", group: "Membros" },
@@ -95,6 +97,7 @@ const ROLE_PERMISSIONS: Record<UserRoleName, string[]> = {
   ADMIN_CONGREGACAO: [
     "dashboard.view",
     "igrejas.view",
+    "sedes.view",
     "congregacoes.view",
     "membros.view", "membros.create", "membros.edit", "membros.export",
     "visitantes.view", "visitantes.create", "visitantes.edit",
@@ -115,6 +118,7 @@ const ROLE_PERMISSIONS: Record<UserRoleName, string[]> = {
   FINANCEIRO: [
     "dashboard.view",
     "igrejas.view",
+    "sedes.view",
     "congregacoes.view",
     "membros.view",
     "carteirinhas.view",
@@ -134,6 +138,7 @@ const ROLE_PERMISSIONS: Record<UserRoleName, string[]> = {
   SECRETARIA: [
     "dashboard.view",
     "igrejas.view",
+    "sedes.view",
     "congregacoes.view",
     "membros.view", "membros.create", "membros.edit", "membros.export",
     "visitantes.view", "visitantes.create", "visitantes.edit",
@@ -144,6 +149,7 @@ const ROLE_PERMISSIONS: Record<UserRoleName, string[]> = {
   PASTOR: [
     "dashboard.view",
     "igrejas.view",
+    "sedes.view",
     "congregacoes.view",
     "membros.view",
     "visitantes.view",
@@ -162,6 +168,7 @@ const ROLE_PERMISSIONS: Record<UserRoleName, string[]> = {
   CONSULTA: [
     "dashboard.view",
     "igrejas.view",
+    "sedes.view",
     "congregacoes.view",
     "membros.view",
     "visitantes.view",

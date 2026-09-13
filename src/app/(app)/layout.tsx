@@ -11,6 +11,13 @@ const NAV_ITEMS: NavEntry[] = [
     href: "/dashboard",
     icon: "dashboard",
   },
+  {
+    key: "estrutura",
+    label: "Estrutura",
+    href: "/estrutura",
+    icon: "igrejas",
+    permission: "igrejas.view",
+  },
 ];
 
 export default async function AppLayout({ children }: { children: ReactNode }) {

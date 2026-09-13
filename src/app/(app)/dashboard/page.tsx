@@ -1,4 +1,6 @@
 import { Building2, Church, Users } from "lucide-react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { requireAuth } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import {
@@ -77,12 +79,15 @@ export default async function DashboardPage() {
             O Ecclesia está sendo construído
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
             O dashboard completo com gráficos e indicadores financeiros chegará
             em breve. Os módulos de igrejas, membros, financeiro, relatórios e
             administração estão sendo desenvolvidos por etapas.
           </p>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/estrutura">Estrutura da igreja</Link>
+          </Button>
         </CardContent>
       </Card>
     </div>
