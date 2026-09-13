@@ -6,3 +6,746 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+enum GenericStatus {
+  ATIVO
+  INATIVO
+}
+
+enum UserRoleName {
+  SUPER_ADMIN
+  ADMIN_SEDE
+  ADMIN_CONGREGACAO
+  FINANCEIRO
+  SECRETARIA
+  PASTOR
+  CONSULTA
+}
+
+enum MemberStatus {
+  ATIVO
+  INATIVO
+  TRANSFERIDO
+  DESLIGADO
+  FALECIDO
+}
+
+enum Gender {
+  MASCULINO
+  FEMININO
+}
+
+enum MaritalStatus {
+  SOLTEIRO
+  CASADO
+  DIVORCIADO
+  VIUVO
+  UNIAO_ESTAVEL
+}
+
+enum PaymentMethod {
+  DINHEIRO
+  PIX
+  CARTAO
+  TRANSFERENCIA
+  DEPOSITO
+  BOLETO
+  OUTROS
+}
+
+enum OfferingType {
+  CULTO
+  MISSOES
+  CONSTRUCAO
+  EVENTOS
+  DEPARTAMENTO
+  ESPECIAL
+  OUTROS
+}
+
+enum ExpenseStatus {
+  PENDENTE
+  PAGO
+  CANCELADO
+}
+
+enum AccountNature {
+  RECEITA
+  DESPESA
+}
+
+enum EntryNature {
+  ENTRADA
+  SAIDA
+}
+
+enum LedgerSource {
+  DIZIMO
+  OFERTA
+  ENTRADA
+  SAIDA
+}
+
+enum ClosingStatus {
+  ABERTO
+  FECHADO
+  REABERTO
+}
+
+enum DocumentType {
+  APRESENTACAO
+  TRANSFERENCIA
+  RECOMENDACAO
+  DECLARACAO_MEMBRO
+  DECLARACAO_VINCULO
+  DECLARACAO_BATISMO
+  PERSONALIZADO
+}
+
+enum CardStatus {
+  ATIVO
+  CANCELADO
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  EXPORT
+  IMPORT
+  LOGIN
+  LOGOUT
+  PRINT
+  CANCEL
+  REVERT
+  CLOSE
+  REOPEN
+  ESTORNO
+}
+
+enum SupplierKeyType {
+  CPF
+  CNPJ
+  EMAIL
+  TELEFONE
+  ALEATORIA
+}
+
+model Church {
+  id          String         @id @default(cuid())
+  name        String
+  legalName   String?
+  cnpj        String?        @unique
+  logoUrl     String?
+  description String?
+  phone       String?
+  email       String?
+  status      GenericStatus  @default(ATIVO)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  sedes           Sede[]
+  congregations   Congregation[]
+  users           User[]
+  members         Member[]
+  visitors        Visitor[]
+  tithes          Tithe[]
+  offerings       Offering[]
+  incomes         Income[]
+  expenses        Expense[]
+  suppliers       Supplier[]
+  accounts        Account[]
+  costCenters     CostCenter[]
+  cashEntries     CashEntry[]
+  cards           MembershipCard[]
+  documents       Document[]
+  templates       LetterTemplate[]
+  closings        FinancialClosing[]
+  auditLogs       AuditLog[]
+  systemSettings  SystemSetting[]
+
+  @@map("churches")
+}
+
+model Sede {
+  id        String         @id @default(cuid())
+  churchId  String
+  church    Church         @relation(fields: [churchId], references: [id], onDelete: Restrict)
+  name      String
+  cnpj      String?
+  logoUrl   String?
+  address   String?
+  cep       String?
+  district  String?
+  city      String?
+  state     String?
+  phone     String?
+  email     String?
+  status    GenericStatus  @default(ATIVO)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  congregations Congregation[]
+  members       Member[]
+
+  @@unique([churchId, name])
+  @@map("sedes")
+}
+
+model Congregation {
+  id        String         @id @default(cuid())
+  churchId  String
+  church    Church         @relation(fields: [churchId], references: [id], onDelete: Restrict)
+  sedeId    String
+  sede      Sede           @relation(fields: [sedeId], references: [id], onDelete: Restrict)
+  code      String
+  name      String
+  address   String?
+  cep       String?
+  district  String?
+  city      String?
+  state     String?
+  phone     String?
+  email     String?
+  imageUrl  String?
+  status    GenericStatus  @default(ATIVO)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  members         Member[]
+  visitors        Visitor[]
+  tithes          Tithe[]
+  offerings       Offering[]
+  incomes         Income[]
+  expenses        Expense[]
+  cashEntries     CashEntry[]
+  costCenters     CostCenter[]
+  cards           MembershipCard[]
+  documents       Document[]
+  closings        FinancialClosing[]
+  users           User[]
+
+  @@unique([sedeId, code])
+  @@unique([sedeId, name])
+  @@index([churchId, status])
+  @@map("congregations")
+}
+
+model User {
+  id             String    @id @default(cuid())
+  churchId       String?
+  church         Church?   @relation(fields: [churchId], references: [id], onDelete: SetNull)
+  congregationId String?
+  congregation   Congregation? @relation(fields: [congregationId], references: [id], onDelete: SetNull)
+  name           String
+  email          String    @unique
+  passwordHash   String
+  active         Boolean   @default(true)
+  lastLoginAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  roles       UserRole[]
+  auditLogs   AuditLog[]
+  tithes      Tithe[]
+  offerings   Offering[]
+  incomes     Income[]
+  expenses    Expense[]
+  expensePaid Expense[]   @relation("ExpensePaidBy")
+  expenseCancelled Expense[] @relation("ExpenseCancelledBy")
+  cashEntries CashEntry[]
+  cards       MembershipCard[]
+  documents   Document[]
+  closingsClosed   FinancialClosing[] @relation("ClosingClosedBy")
+  closingsReopened FinancialClosing[] @relation("ClosingReopenedBy")
+
+  @@index([churchId])
+  @@map("users")
+}
+
+model Role {
+  id          String        @id @default(cuid())
+  name        UserRoleName  @unique
+  description String?
+  system      Boolean       @default(false)
+  active      Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+
+  permissions RolePermission[]
+  users       UserRole[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String  @id @default(cuid())
+  key         String  @unique
+  name        String
+  group       String?
+  description String?
+  createdAt   DateTime @default(now())
+
+  roles RolePermission[]
+
+  @@index([group])
+  @@map("permissions")
+}
+
+model RolePermission {
+  id           String     @id @default(cuid())
+  roleId       String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roleId String
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, roleId])
+  @@map("user_roles")
+}
+
+model Member {
+  id           String       @id @default(cuid())
+  churchId     String
+  church       Church       @relation(fields: [churchId], references: [id], onDelete: Restrict)
+  sedeId       String
+  sede         Sede         @relation(fields: [sedeId], references: [id], onDelete: Restrict)
+  congregationId String
+  congregation Congregation @relation(fields: [congregationId], references: [id], onDelete: Restrict)
+  code         String
+  name         String
+  photoUrl     String?
+  cpf          String?      @unique
+  rg           String?
+  birthDate    DateTime?
+  gender       Gender?
+  maritalStatus MaritalStatus?
+  phone        String?
+  whatsapp     String?
+  email        String?
+  address      String?
+  cep          String?
+  district     String?
+  city         String?
+  state        String?
+  conversionDate  DateTime?
+  baptismDate     DateTime?
+  receptionDate   DateTime?
+  cargo        String?
+  ministerio   String?
+  departamento String?
+  situation    MemberStatus @default(ATIVO)
+  observations String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  tithes      Tithe[]
+  offerings   Offering[]
+  cards       MembershipCard[]
+  documents   Document[]
+  visitor     Visitor[]
+
+  @@unique([congregationId, code])
+  @@index([churchId, situation])
+  @@index([congregationId, situation])
+  @@map("members")
+}
+
+model Visitor {
+  id          String    @id @default(cuid())
+  churchId    String
+  church      Church    @relation(fields: [churchId], references: [id], onDelete: Restrict)
+  congregationId String
+  congregation Congregation @relation(fields: [congregationId], references: [id], onDelete: Restrict)
+  name        String
+  phone       String?
+  whatsapp    String?
+  email       String?
+  visitDate   DateTime?
+  observations String?
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  convertedToMemberId String? @unique
+  convertedToMember   Member? @relation(fields: [convertedToMemberId], references: [id], onDelete: SetNull)
+
+  @@index([congregationId])
+  @@map("visitors")
+}
+
+model Tithe {
+  id            String        @id @default(cuid())
+  churchId      String
+  church        Church        @relation(fields: [churchId], references: [id], onDelete: Restrict)
+  congregationId String
+  congregation  Congregation  @relation(fields: [congregationId], references: [id], onDelete: Restrict)
+  memberId      String?
+  member        Member?       @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  date          DateTime
+  value         Decimal       @db.Decimal(12, 2)
+  paymentMethod PaymentMethod @default(DINHEIRO)
+  costCenterId  String?
+  costCenter    CostCenter?   @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
+  accountId     String
+  account       Account       @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  accountingCode String
+  observation   String?
+  isAnonymous   Boolean       @default(false)
+  registeredById String?
+  registeredBy  User?         @relation(fields: [registeredById], references: [id], onDelete: SetNull)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([congregationId, date])
+  @@index([memberId, date])
+  @@index([churchId, date])
+  @@map("tithes")
+}
+
+model Offering {
+  id            String        @id @default(cuid())
+  churchId      String
+  church        Church        @relation(fields: [churchId], references: [id], onDelete: Restrict)
+  congregationId String
+  congregation  Congregation  @relation(fields: [congregationId], references: [id], onDelete: Restrict)
+  memberId      String?
+  member        Member?       @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  contributor   String?
+  type          OfferingType  @default(CULTO)
+  date          DateTime
+  value         Decimal       @db.Decimal(12, 2)
+  paymentMethod PaymentMethod @default(DINHEIRO)
+  costCenterId  String?
+  costCenter    CostCenter?   @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
+  accountId     String
+  account       Account       @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  accountingCode String
+  observation   String?
+  isAnonymous   Boolean       @default(false)
+  registeredById String?
+  registeredBy  User?         @relation(fields: [registeredById], references: [id], onDelete: SetNull)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([congregationId, date])
+  @@index([memberId, date])
+  @@index([churchId, date])
+  @@index([type])
+  @@map("offerings")
+}
+
+model Income {
+  id            String        @id @default(cuid())
+  code          String
+  churchId      String
+  church        Church        @relation(fields: [churchId], references: [id], onDelete: Restrict)
+  congregationId String
+  congregation  Congregation  @relation(fields: [congregationId], references: [id], onDelete: Restrict)
+  date          DateTime
+  description   String
+  value         Decimal       @db.Decimal(12, 2)
+  paymentMethod PaymentMethod @default(DINHEIRO)
+  document      String?
+  costCenterId  String?
+  costCenter    CostCenter?   @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
+  accountId     String
+  account       Account       @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  accountingCode String
+  responsible   String?
+  observation   String?
+  registeredById String?
+  registeredBy  User?         @relation(fields: [registeredById], references: [id], onDelete: SetNull)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@unique([congregationId, code])
+  @@index([churchId, date])
+  @@index([congregationId, date])
+  @@index([accountId, date])
+  @@map("incomes")
+}
+
+model Expense {
+  id            String        @id @default(cuid())
+  code          String
+  churchId      String
+  church        Church        @relation(fields: [churchId], references: [id], onDelete: Restrict)
+  congregationId String
+  congregation  Congregation  @relation(fields: [congregationId], references: [id], onDelete: Restrict)
+  date          DateTime
+  dueDate       DateTime?
+  paymentDate   DateTime?
+  supplierId    String?
+  supplier      Supplier?     @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  beneficiary   String?
+  description   String
+  value         Decimal       @db.Decimal(12, 2)
+  paymentMethod PaymentMethod @default(DINHEIRO)
+  document      String?
+  costCenterId  String?
+  costCenter    CostCenter?   @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
+  accountId     String
+  account       Account       @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  accountingCode String
+  status        ExpenseStatus @default(PENDENTE)
+  observation   String?
+  attachments   Json?
+  paidAt        DateTime?
+  paidById      String?
+  paidBy        User?         @relation("ExpensePaidBy", fields: [paidById], references: [id], onDelete: SetNull)
+  cancelledAt   DateTime?
+  cancelledById String?
+  cancelledBy   User?         @relation("ExpenseCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
+  registeredById String?
+  registeredBy  User?         @relation(fields: [registeredById], references: [id], onDelete: SetNull)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@unique([congregationId, code])
+  @@index([churchId, date])
+  @@index([congregationId, date])
+  @@index([status])
+  @@index([accountId, date])
+  @@map("expenses")
+}
+
+model Supplier {
+  id          String           @id @default(cuid())
+  churchId    String
+  church      Church           @relation(fields: [churchId], references: [id], onDelete: Restrict)
+  name        String
+  cpfCnpj     String?          @unique
+  phone       String?
+  email       String?
+  address     String?
+  pix         String?
+  pixKeyType  SupplierKeyType?
+  observation String?
+  status      GenericStatus    @default(ATIVO)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  expenses Expense[]
+
+  @@index([churchId, status])
+  @@map("suppliers")
+}
+
+model Account {
+  id            String        @id @default(cuid())
+  churchId      String
+  church        Church        @relation(fields: [churchId], references: [id], onDelete: Restrict)
+  code          String
+  name          String
+  nature        AccountNature
+  parentId      String?
+  parent        Account?      @relation("AccountTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children      Account[]     @relation("AccountTree")
+  level         Int           @default(1)
+  accountingCode String
+  description   String?
+  status        GenericStatus @default(ATIVO)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  tithes      Tithe[]
+  offerings   Offering[]
+  incomes     Income[]
+  expenses    Expense[]
+  cashEntries CashEntry[]
+
+  @@unique([churchId, accountingCode])
+  @@index([churchId, nature])
+  @@map("accounts")
+}
+
+model CostCenter {
+  id          String         @id @default(cuid())
+  churchId    String
+  church      Church         @relation(fields: [churchId], references: [id], onDelete: Restrict)
+  code        String
+  name        String
+  description String?
+  congregationId String?
+  congregation Congregation? @relation(fields: [congregationId], references: [id], onDelete: SetNull)
+  status      GenericStatus  @default(ATIVO)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  tithes    Tithe[]
+  offerings Offering[]
+  incomes   Income[]
+  expenses  Expense[]
+  cashEntries CashEntry[]
+
+  @@unique([churchId, code])
+  @@index([churchId, status])
+  @@map("cost_centers")
+}
+
+model CashEntry {
+  id          String       @id @default(cuid())
+  churchId    String
+  church      Church       @relation(fields: [churchId], references: [id], onDelete: Restrict)
+  congregationId String
+  congregation Congregation @relation(fields: [congregationId], references: [id], onDelete: Restrict)
+  date        DateTime
+  document    String?
+  description String
+  nature      EntryNature
+  value       Decimal      @db.Decimal(12, 2)
+  accountId   String
+  account     Account      @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  accountingCode String
+  costCenterId String?
+  costCenter  CostCenter?  @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
+  sourceType  LedgerSource
+  sourceId    String?
+  createdById String?
+  createdBy   User?        @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime     @default(now())
+
+  @@index([congregationId, date])
+  @@index([congregationId, accountId, date])
+  @@index([churchId, date])
+  @@index([sourceType, sourceId])
+  @@map("cash_entries")
+}
+
+model FinancialClosing {
+  id          String         @id @default(cuid())
+  churchId    String
+  church      Church         @relation(fields: [churchId], references: [id], onDelete: Restrict)
+  congregationId String
+  congregation Congregation  @relation(fields: [congregationId], references: [id], onDelete: Restrict)
+  year        Int
+  month       Int
+  status      ClosingStatus  @default(ABERTO)
+  revenue     Decimal?       @db.Decimal(14, 2)
+  expense     Decimal?       @db.Decimal(14, 2)
+  balance     Decimal?       @db.Decimal(14, 2)
+  closedAt    DateTime?
+  closedById  String?
+  closedBy    User?          @relation("ClosingClosedBy", fields: [closedById], references: [id], onDelete: SetNull)
+  reopenedAt  DateTime?
+  reopenedById String?
+  reopenedBy  User?          @relation("ClosingReopenedBy", fields: [reopenedById], references: [id], onDelete: SetNull)
+  observations String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@unique([congregationId, year, month])
+  @@index([churchId, year, month])
+  @@map("financial_closings")
+}
+
+model MembershipCard {
+  id          String      @id @default(cuid())
+  churchId    String
+  church      Church      @relation(fields: [churchId], references: [id], onDelete: Restrict)
+  congregationId String
+  congregation Congregation @relation(fields: [congregationId], references: [id], onDelete: Restrict)
+  memberId    String
+  member      Member      @relation(fields: [memberId], references: [id], onDelete: Restrict)
+  cardNumber  String?
+  issueDate   DateTime    @default(now())
+  validityDate DateTime?
+  status      CardStatus  @default(ATIVO)
+  qrToken     String?     @unique
+  signatureUrl String?
+  createdById String?
+  createdBy   User?       @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime    @default(now())
+
+  @@index([congregationId])
+  @@index([memberId])
+  @@map("membership_cards")
+}
+
+model LetterTemplate {
+  id        String       @id @default(cuid())
+  churchId  String
+  church    Church       @relation(fields: [churchId], references: [id], onDelete: Restrict)
+  type      DocumentType
+  title     String
+  body      String
+  active    Boolean      @default(true)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  documents Document[]
+
+  @@index([churchId, type])
+  @@map("letter_templates")
+}
+
+model Document {
+  id          String       @id @default(cuid())
+  churchId    String
+  church      Church       @relation(fields: [churchId], references: [id], onDelete: Restrict)
+  congregationId String?
+  congregation Congregation? @relation(fields: [congregationId], references: [id], onDelete: SetNull)
+  memberId    String?
+  member      Member?      @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  type        DocumentType
+  templateId  String?
+  template    LetterTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  protocol    String?
+  title       String
+  content     String
+  signatureName String?
+  issueDate   DateTime     @default(now())
+  createdById String?
+  createdBy   User?        @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime     @default(now())
+
+  @@index([churchId, type])
+  @@index([memberId])
+  @@map("documents")
+}
+
+model AuditLog {
+  id        String       @id @default(cuid())
+  churchId  String?
+  church    Church?      @relation(fields: [churchId], references: [id], onDelete: SetNull)
+  userId    String?
+  user      User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    AuditAction
+  module    String
+  entity    String?
+  entityId  String?
+  description String?
+  oldValues Json?
+  newValues Json?
+  ip        String?
+  createdAt DateTime     @default(now())
+
+  @@index([churchId, createdAt])
+  @@index([entity, entityId])
+  @@index([userId, createdAt])
+  @@map("audit_logs")
+}
+
+model SystemSetting {
+  id        String   @id @default(cuid())
+  churchId  String?
+  church    Church?  @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  key       String
+  value     Json?
+  category  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([churchId, key])
+  @@map("system_settings")
+}
