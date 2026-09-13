@@ -44,6 +44,7 @@ export function buildData(resourceKey: string, values: Record<string, unknown>) 
   if (!def) throw new Error(`Recurso desconhecido: ${resourceKey}`);
   const data: Record<string, unknown> = {};
   for (const field of def.fields) {
+    if (field.readonly) continue;
     if (
       field.required &&
       (values[field.key] === undefined || values[field.key] === "" || values[field.key] === null)

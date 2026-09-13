@@ -3,9 +3,14 @@
 import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
-import type { FieldDef, Option } from "@/modules/registration/definitions";
+import type { FieldDef, Option, RowActionDef } from "@/modules/registration/definitions";
 import { displayField } from "@/modules/registration/validators";
-import { createRecord, updateRecord, removeRecord } from "@/app/actions/registration";
+import {
+  createRecord,
+  updateRecord,
+  removeRecord,
+  runRowActionById,
+} from "@/app/actions/registration";
 import { buildFormDefaults, fillEmptyFields } from "@/lib/form-utils";
 import { SELECT_INPUT_CLASS } from "@/lib/styles";
 import { Button } from "@/components/ui/button";
@@ -37,6 +42,7 @@ type Props = {
   fields: FieldDef[];
   rows: Record<string, unknown>[];
   canWrite: boolean;
+  actions?: RowActionDef[];
   relationOptions?: Record<string, Option[]>;
 };
 
@@ -87,6 +93,7 @@ export function CrudManager({
   fields,
   rows,
   canWrite,
+  actions = [],
   relationOptions = {},
 }: Props) {
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -151,6 +158,16 @@ export function CrudManager({
     setDeleting(null);
   }
 
+  async function handleRowAction(rowId: string, actionKey: string) {
+    setBusy(true);
+    setActionError(null);
+    const result = await runRowActionById(resourceKey, actionKey, rowId);
+    setBusy(false);
+    if (!result.ok) {
+      setActionError(result.error ?? "Erro ao executar ação.");
+    }
+  }
+
   const tableFields = visibleFields.filter((f) => !STATUS_KEYS.includes(f.key));
 
   return (
@@ -165,6 +182,11 @@ export function CrudManager({
             <Plus className="mr-2 h-4 w-4" />
             Novo {singular}
           </Button>
+        )}
+      {actionError && (
+          <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+            {actionError}
+          </p>
         )}
       </div>
 
@@ -205,7 +227,19 @@ export function CrudManager({
                     <TableCell>{statusBadge(statusField, row[statusKey])}</TableCell>
                   )}
                   <TableCell className="text-right">
-                    <div className="flex justify-end">
+                    <div className="flex items-center justify-end gap-1">
+                      {actions.map((a) => (
+                        <Button
+                          key={a.key}
+                          variant="outline"
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          disabled={busy}
+                          onClick={() => handleRowAction(row.id as string, a.key)}
+                        >
+                          {a.label}
+                        </Button>
+                      ))}
                       {canWrite && (
                         <>
                           <Button variant="ghost" size="icon" onClick={() => openEdit(row)}>
@@ -236,30 +270,51 @@ export function CrudManager({
             </DialogDescription>
           </DialogHeader>
           <form id="crud-form" onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-            {fields.map((f) =>
-              f.type === "select" || f.type === "relation" ? (
-                <div key={f.key} className="space-y-1">
-                  <Label htmlFor={f.key}>
-                    {f.label}
-                    {f.required && <span className="text-destructive"> *</span>}
-                  </Label>
-                  <select
-                    id={f.key}
-                    className={SELECT_INPUT_CLASS}
-                    {...form.register(f.key)}
-                  >
-                    <option value="">Selecione…</option>
-                    {(f.type === "select"
-                      ? f.options ?? []
-                      : relationOptions[f.key] ?? []
-                    ).map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              ) : (
+            {fields.map((f) => {
+              if (f.readonly) return null;
+              if (f.type === "select" || f.type === "relation") {
+                return (
+                  <div key={f.key} className="space-y-1">
+                    <Label htmlFor={f.key}>
+                      {f.label}
+                      {f.required && <span className="text-destructive"> *</span>}
+                    </Label>
+                    <select
+                      id={f.key}
+                      className={SELECT_INPUT_CLASS}
+                      {...form.register(f.key)}
+                    >
+                      <option value="">Selecione…</option>
+                      {(f.type === "select"
+                        ? f.options ?? []
+                        : relationOptions[f.key] ?? []
+                      ).map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                );
+              }
+              if (f.type === "textarea") {
+                return (
+                  <div key={f.key} className="space-y-1">
+                    <Label htmlFor={f.key}>
+                      {f.label}
+                      {f.required && <span className="text-destructive"> *</span>}
+                    </Label>
+                    <textarea
+                      id={f.key}
+                      rows={3}
+                      className={`${SELECT_INPUT_CLASS} h-auto min-h-20 py-2`}
+                      placeholder={f.hint}
+                      {...form.register(f.key)}
+                    />
+                  </div>
+                );
+              }
+              return (
                 <div key={f.key} className="space-y-1">
                   <Label htmlFor={f.key}>
                     {f.label}
@@ -272,8 +327,8 @@ export function CrudManager({
                     {...form.register(f.key)}
                   />
                 </div>
-              )
-            )}
+              );
+            })}
             {actionError && <p className="text-sm text-destructive">{actionError}</p>}
           </form>
           <DialogFooter>

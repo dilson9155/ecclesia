@@ -5,11 +5,18 @@ export type { Option };
 export type FieldDef = {
   key: string;
   label: string;
-  type: "text" | "select" | "relation" | "checkbox" | "date";
+  type: "text" | "select" | "relation" | "checkbox" | "date" | "textarea";
   required?: boolean;
+  readonly?: boolean;
   options?: Option[];
   relation?: { resourceKey: string; valueField: string; labelField: string };
   hint?: string;
+};
+
+export type RowActionDef = {
+  key: string;
+  label: string;
+  permission: string;
 };
 
 export type ResourceDef = {
@@ -24,6 +31,7 @@ export type ResourceDef = {
   canCreate: boolean;
   canDelete: boolean;
   standalone?: boolean;
+  actions?: RowActionDef[];
   fields: FieldDef[];
 };
 
@@ -183,6 +191,43 @@ export const RESOURCES: ResourceDef[] = [
       { key: "departamento", label: "Departamento", type: "text" },
       { key: "situation", label: "Situação", type: "select", options: MEMBER_STATUS_OPTIONS },
       { key: "observations", label: "Observações", type: "text" },
+    ],
+  },
+  {
+    key: "visitantes",
+    singular: "Visitante",
+    plural: "Visitantes",
+    description: "Visitantes das congregações, com conversão em membro",
+    viewPermission: "visitantes.view",
+    createPermission: "visitantes.create",
+    editPermission: "visitantes.edit",
+    deletePermission: "visitantes.delete",
+    canCreate: true,
+    canDelete: true,
+    standalone: true,
+    actions: [
+      { key: "converter", label: "Converter em membro", permission: "membros.create" },
+    ],
+    fields: [
+      {
+        key: "congregationId",
+        label: "Congregação",
+        type: "relation",
+        required: true,
+        relation: { resourceKey: "congregacoes", valueField: "id", labelField: "name" },
+      },
+      { key: "name", label: "Nome completo", type: "text", required: true },
+      { key: "phone", label: "Telefone", type: "text" },
+      { key: "whatsapp", label: "WhatsApp", type: "text" },
+      { key: "email", label: "E-mail", type: "text" },
+      { key: "visitDate", label: "Data da visita", type: "date" },
+      { key: "observations", label: "Observações", type: "textarea" },
+      {
+        key: "convertedToMemberId",
+        label: "Situação",
+        type: "text",
+        readonly: true,
+      },
     ],
   },
 ];

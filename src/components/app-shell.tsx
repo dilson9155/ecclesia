@@ -12,6 +12,7 @@ import {
   LogOut,
   Menu,
   Settings,
+  UserPlus,
   Users,
   Wallet,
   X,
@@ -24,13 +25,14 @@ export type NavItem = {
   key: string;
   label: string;
   href: string;
-  icon?: "dashboard" | "igrejas" | "membros" | "financeiro" | "relatorios" | "admin";
+  icon?: "dashboard" | "igrejas" | "membros" | "visitantes" | "financeiro" | "relatorios" | "admin";
 };
 
 const NAV_ICONS: Record<NonNullable<NavItem["icon"]>, ReactNode> = {
   dashboard: <LayoutDashboard className="h-4 w-4" />,
   igrejas: <Building2 className="h-4 w-4" />,
   membros: <Users className="h-4 w-4" />,
+  visitantes: <UserPlus className="h-4 w-4" />,
   financeiro: <Wallet className="h-4 w-4" />,
   relatorios: <FileText className="h-4 w-4" />,
   admin: <Settings className="h-4 w-4" />,

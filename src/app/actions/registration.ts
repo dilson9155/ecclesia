@@ -7,6 +7,7 @@ import { getResource } from "@/modules/registration/definitions";
 import type { ResourceDef } from "@/modules/registration/definitions";
 import { requirePermission } from "@/lib/rbac";
 import { saveRow, deleteRow } from "@/services/registration.service";
+import { runRowAction } from "@/services/actions.service";
 
 async function authorize(def: ResourceDef, operation: "create" | "update" | "delete") {
   const permission =
@@ -58,5 +59,21 @@ export async function removeRecord(resourceKey: string, id: string) {
     return { ok: false, error: (error as Error).message };
   }
   revalidatePath(`/estrutura/${resourceKey}`);
+  return { ok: true };
+}
+
+export async function runRowActionById(resourceKey: string, actionKey: string, id: string) {
+  const def = getResource(resourceKey);
+  const action = def?.actions?.find((a) => a.key === actionKey);
+  if (!def || !action) redirect("/forbidden");
+  const user = await requirePermission(action.permission);
+  if (!user.churchId) return { ok: false, error: "Nenhuma igreja vinculada ao seu usuário." };
+  try {
+    await runRowAction(resourceKey, actionKey, { userId: user.id, churchId: user.churchId }, id);
+  } catch (error) {
+    return { ok: false, error: (error as Error).message };
+  }
+  revalidatePath(`/${resourceKey}`);
+  revalidatePath("/membros");
   return { ok: true };
 }

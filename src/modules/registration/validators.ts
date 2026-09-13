@@ -11,6 +11,8 @@ const VALIDATORS: Record<string, FieldValidator> = {
 
 const DISPLAYS: Record<string, FieldDisplay> = {
   "membros.cpf": (v) => (v ? formatCpf(String(v)) : null),
+  "visitantes.convertedToMemberId": (v) =>
+    v ? "Convertido" : "Pendente",
 };
 
 export function validateField(resourceKey: string, fieldKey: string, value: string): string | null {

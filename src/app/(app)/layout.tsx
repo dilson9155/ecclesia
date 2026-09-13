@@ -25,6 +25,13 @@ const NAV_ITEMS: NavEntry[] = [
     icon: "membros",
     permission: "membros.view",
   },
+  {
+    key: "visitantes",
+    label: "Visitantes",
+    href: "/visitantes",
+    icon: "visitantes",
+    permission: "visitantes.view",
+  },
 ];
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
