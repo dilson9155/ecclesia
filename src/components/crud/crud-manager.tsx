@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
 import type { FieldDef, Option } from "@/modules/registration/definitions";
+import { displayField } from "@/modules/registration/validators";
 import { createRecord, updateRecord, removeRecord } from "@/app/actions/registration";
 import { buildFormDefaults, fillEmptyFields } from "@/lib/form-utils";
 import { SELECT_INPUT_CLASS } from "@/lib/styles";
@@ -39,6 +40,8 @@ type Props = {
   relationOptions?: Record<string, Option[]>;
 };
 
+const STATUS_KEYS = ["status", "situation"];
+
 function optionLabel(field: FieldDef, value: unknown): string | null {
   if (value === null || value === undefined || value === "") return null;
   for (const o of field.options ?? []) {
@@ -47,23 +50,30 @@ function optionLabel(field: FieldDef, value: unknown): string | null {
   return null;
 }
 
-function statusBadge(status: unknown) {
-  const inactive = String(status ?? "ATIVO") === "INATIVO";
-  return (
-    <Badge variant={inactive ? "secondary" : "default"}>
-      {inactive ? "Inativo" : "Ativo"}
-    </Badge>
-  );
+function statusBadge(field: FieldDef, value: unknown) {
+  const frame = optionLabel(field, value) ?? String(value ?? "ATIVO");
+  const active = String(value ?? "ATIVO") === "ATIVO";
+  return <Badge variant={active ? "default" : "secondary"}>{frame}</Badge>;
 }
 
-function formatValue(field: FieldDef, value: unknown, relationLabels?: Map<string, string>): string {
+function formatValue(
+  resourceKey: string,
+  field: FieldDef,
+  value: unknown,
+  relationLabels?: Map<string, string>
+): string {
+  const custom = displayField(resourceKey, field.key, value);
+  if (custom !== null) return custom;
   if (field.type === "select") {
     return optionLabel(field, value) ?? (value === null || value === undefined ? "—" : String(value));
   }
   if (field.type === "relation") {
     if (value === null || value === undefined || value === "") return "—";
-    const label = relationLabels?.get(String(value));
-    return label ?? String(value);
+    return relationLabels?.get(String(value)) ?? String(value);
+  }
+  if (field.type === "date") {
+    const s = String(value ?? "");
+    return /^\d{4}-\d{2}-\d{2}/.test(s) ? s.slice(0, 10) : s || "—";
   }
   if (value === null || value === undefined) return "—";
   return String(value);
@@ -89,6 +99,8 @@ export function CrudManager({
   const form = useForm<Record<string, unknown>>({ defaultValues });
 
   const visibleFields = fields.slice(0, 6);
+  const statusField = fields.find((f) => STATUS_KEYS.includes(f.key));
+  const statusKey = statusField?.key;
 
   const relationLabels = useMemo(() => {
     const out: Record<string, Map<string, string>> = {};
@@ -139,7 +151,7 @@ export function CrudManager({
     setDeleting(null);
   }
 
-  const statusField = fields.find((f) => f.key === "status");
+  const tableFields = visibleFields.filter((f) => !STATUS_KEYS.includes(f.key));
 
   return (
     <div className="space-y-4">
@@ -160,7 +172,7 @@ export function CrudManager({
         <Table>
           <TableHeader>
             <TableRow>
-              {visibleFields.map((f) => f.key !== "status" && (
+              {tableFields.map((f) => (
                 <TableHead key={f.key}>{f.label}</TableHead>
               ))}
               {statusField && <TableHead>Situação</TableHead>}
@@ -171,7 +183,7 @@ export function CrudManager({
             {rows.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={visibleFields.filter((f) => f.key !== "status").length + (statusField ? 2 : 1)}
+                  colSpan={tableFields.length + (statusField ? 1 : 0) + 1}
                   className="h-24 text-center text-muted-foreground"
                 >
                   Nenhum registro cadastrado.
@@ -180,20 +192,17 @@ export function CrudManager({
             ) : (
               rows.map((row) => (
                 <TableRow key={row.id as string}>
-                  {visibleFields.map((f) => {
-                    if (f.key === "status") return null;
-                    return (
-                      <TableCell
-                        key={f.key}
-                        className={f.key === "name" ? "font-medium" : undefined}
-                        title={f.type === "text" ? String(row[f.key] ?? "") : undefined}
-                      >
-                        {formatValue(f, row[f.key], relationLabels[f.key])}
-                      </TableCell>
-                    );
-                  })}
-                  {statusField && (
-                    <TableCell>{statusBadge(row["status"])}</TableCell>
+                  {tableFields.map((f) => (
+                    <TableCell
+                      key={f.key}
+                      className={f.key === "name" ? "font-medium" : undefined}
+                      title={f.type === "text" ? String(row[f.key] ?? "") : undefined}
+                    >
+                      {formatValue(resourceKey, f, row[f.key], relationLabels[f.key])}
+                    </TableCell>
+                  ))}
+                  {statusField && statusKey && (
+                    <TableCell>{statusBadge(statusField, row[statusKey])}</TableCell>
                   )}
                   <TableCell className="text-right">
                     <div className="flex justify-end">
@@ -227,46 +236,44 @@ export function CrudManager({
             </DialogDescription>
           </DialogHeader>
           <form id="crud-form" onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-            {fields.map((f) => (
-              <div key={f.key} className="space-y-1.5">
-                {f.type === "select" || f.type === "relation" ? (
-                  <div className="space-y-1">
-                    <Label htmlFor={f.key}>
-                      {f.label}
-                      {f.required && <span className="text-destructive"> *</span>}
-                    </Label>
-                    <select
-                      id={f.key}
-                      className={SELECT_INPUT_CLASS}
-                      {...form.register(f.key)}
-                    >
-                      <option value="">Selecione…</option>
-                      {(f.type === "select"
-                        ? f.options ?? []
-                        : relationOptions[f.key] ?? []
-                      ).map((o) => (
-                        <option key={o.value} value={o.value}>
-                          {o.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                ) : (
-                  <div className="space-y-1">
-                    <Label htmlFor={f.key}>
-                      {f.label}
-                      {f.required && <span className="text-destructive"> *</span>}
-                    </Label>
-                    <Input
-                      id={f.key}
-                      type="text"
-                      placeholder={f.hint}
-                      {...form.register(f.key)}
-                    />
-                  </div>
-                )}
-              </div>
-            ))}
+            {fields.map((f) =>
+              f.type === "select" || f.type === "relation" ? (
+                <div key={f.key} className="space-y-1">
+                  <Label htmlFor={f.key}>
+                    {f.label}
+                    {f.required && <span className="text-destructive"> *</span>}
+                  </Label>
+                  <select
+                    id={f.key}
+                    className={SELECT_INPUT_CLASS}
+                    {...form.register(f.key)}
+                  >
+                    <option value="">Selecione…</option>
+                    {(f.type === "select"
+                      ? f.options ?? []
+                      : relationOptions[f.key] ?? []
+                    ).map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div key={f.key} className="space-y-1">
+                  <Label htmlFor={f.key}>
+                    {f.label}
+                    {f.required && <span className="text-destructive"> *</span>}
+                  </Label>
+                  <Input
+                    id={f.key}
+                    type={f.type === "date" ? "date" : "text"}
+                    placeholder={f.hint}
+                    {...form.register(f.key)}
+                  />
+                </div>
+              )
+            )}
             {actionError && <p className="text-sm text-destructive">{actionError}</p>}
           </form>
           <DialogFooter>

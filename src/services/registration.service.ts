@@ -2,20 +2,23 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { getResource } from "@/modules/registration/definitions";
 import type { FieldDef } from "@/modules/registration/definitions";
+import { validateField } from "@/modules/registration/validators";
 import { auditLog } from "@/services/audit.service";
 
-type ModelKey = "church" | "sede" | "congregation";
+type ModelKey = "church" | "sede" | "congregation" | "member";
 
 const MODEL_BY_RESOURCE: Record<string, ModelKey> = {
   igrejas: "church",
   sedes: "sede",
   congregacoes: "congregation",
+  membros: "member",
 };
 
 const SORT_BY_MODEL: Record<ModelKey, { field: string; direction: "asc" }> = {
   church: { field: "name", direction: "asc" },
   sede: { field: "name", direction: "asc" },
   congregation: { field: "code", direction: "asc" },
+  member: { field: "code", direction: "asc" },
 };
 
 export type Row = {
@@ -28,6 +31,10 @@ export type Option = { value: string; label: string };
 function coerceValue(field: FieldDef, raw: unknown): unknown {
   if (raw === null || raw === undefined || raw === "") {
     return null;
+  }
+  if (field.type === "date") {
+    const d = new Date(String(raw));
+    return Number.isNaN(d.getTime()) ? null : d;
   }
   return String(raw);
 }
@@ -42,6 +49,10 @@ export function buildData(resourceKey: string, values: Record<string, unknown>) 
       (values[field.key] === undefined || values[field.key] === "" || values[field.key] === null)
     ) {
       throw new Error(`Campo obrigatório: ${field.label}`);
+    }
+    if (values[field.key] !== undefined && values[field.key] !== "") {
+      const error = validateField(resourceKey, field.key, String(values[field.key]));
+      if (error) throw new Error(error);
     }
     const value = coerceValue(field, values[field.key]);
     if (value === null) continue;
@@ -70,6 +81,10 @@ export async function listRows(resourceKey: string, churchId: string): Promise<R
   return rows.map((row) => {
     const out: Row = { id: row.id };
     for (const f of def.fields) {
+      if (f.type === "date" && row[f.key] instanceof Date) {
+        out[f.key] = (row[f.key] as Date).toISOString().slice(0, 10);
+        continue;
+      }
       out[f.key] = row[f.key] as unknown;
     }
     return out;
@@ -122,6 +137,18 @@ export async function saveRow(
     data.churchId = actor.churchId;
   }
 
+  if (resourceKey === "membros") {
+    const congregationId = String(data.congregationId ?? "");
+    if (!congregationId) throw new Error("Campo obrigatório: Congregação");
+    const congregation = await prisma.congregation.findUnique({ where: { id: congregationId } });
+    if (!congregation) throw new Error("Congregação não encontrada.");
+    if (!data.code) {
+      const count = await prisma.member.count({ where: { congregationId } });
+      data.code = String(count + 1).padStart(4, "0");
+    }
+    data.sedeId = congregation.sedeId;
+  }
+
   const delegate = prisma[model] as unknown as {
     create: (args: { data: Record<string, unknown> }) => Promise<Row>;
     update: (args: {
@@ -147,10 +174,10 @@ export async function saveRow(
       userId: actor.userId,
       churchId: actor.churchId,
       action: "UPDATE",
-      module: "estrutura",
+      module: def.key,
       entity: def.singular,
       entityId: updated.id,
-      description: `Atualizada ${def.singular}`,
+      description: `Registro atualizado (${def.singular})`,
       newValues: data as never,
     });
     return updated;
@@ -161,10 +188,10 @@ export async function saveRow(
     userId: actor.userId,
     churchId: actor.churchId,
     action: "CREATE",
-    module: "estrutura",
+    module: def.key,
     entity: def.singular,
     entityId: created.id,
-    description: `Criada ${def.singular}`,
+    description: `Registro criado (${def.singular})`,
     newValues: data as never,
   });
   return created;
@@ -198,9 +225,9 @@ export async function deleteRow(
     userId: actor.userId,
     churchId: actor.churchId,
     action: "DELETE",
-    module: "estrutura",
+    module: def.key,
     entity: def.singular,
     entityId: id,
-    description: `Excluída ${def.singular}`,
+    description: `Registro excluído (${def.singular})`,
   });
 }

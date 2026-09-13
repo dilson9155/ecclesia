@@ -11,6 +11,7 @@ export default async function EstruturaLayout({ children }: { children: ReactNod
 
   const visibleResources = [];
   for (const r of RESOURCES) {
+    if (r.standalone) continue;
     if (await can(user, r.viewPermission)) visibleResources.push(r);
   }
 
