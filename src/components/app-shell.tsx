@@ -7,10 +7,12 @@ import { usePathname } from "next/navigation";
 import {
   Building2,
   Church,
+  CreditCard,
   FileText,
   LayoutDashboard,
   LogOut,
   Menu,
+  ScrollText,
   Settings,
   UserPlus,
   Users,
@@ -25,7 +27,7 @@ export type NavItem = {
   key: string;
   label: string;
   href: string;
-  icon?: "dashboard" | "igrejas" | "membros" | "visitantes" | "financeiro" | "relatorios" | "admin";
+  icon?: "dashboard" | "igrejas" | "membros" | "visitantes" | "carteirinhas" | "cartas" | "financeiro" | "relatorios" | "admin";
 };
 
 const NAV_ICONS: Record<NonNullable<NavItem["icon"]>, ReactNode> = {
@@ -33,6 +35,8 @@ const NAV_ICONS: Record<NonNullable<NavItem["icon"]>, ReactNode> = {
   igrejas: <Building2 className="h-4 w-4" />,
   membros: <Users className="h-4 w-4" />,
   visitantes: <UserPlus className="h-4 w-4" />,
+  carteirinhas: <CreditCard className="h-4 w-4" />,
+  cartas: <ScrollText className="h-4 w-4" />,
   financeiro: <Wallet className="h-4 w-4" />,
   relatorios: <FileText className="h-4 w-4" />,
   admin: <Settings className="h-4 w-4" />,

@@ -32,6 +32,20 @@ const NAV_ITEMS: NavEntry[] = [
     icon: "visitantes",
     permission: "visitantes.view",
   },
+  {
+    key: "carteirinhas",
+    label: "Carteirinhas",
+    href: "/carteirinhas",
+    icon: "carteirinhas",
+    permission: "carteirinhas.view",
+  },
+  {
+    key: "cartas",
+    label: "Cartas",
+    href: "/cartas",
+    icon: "cartas",
+    permission: "cartas.view",
+  },
 ];
 
 export default async function AppLayout({ children }: { children: ReactNode }) {

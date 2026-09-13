@@ -1,4 +1,4 @@
-import { PrismaClient, UserRoleName } from "@prisma/client";
+import { PrismaClient, DocumentType, UserRoleName } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
@@ -257,6 +257,48 @@ const COST_CENTERS: Array<{ code: string; name: string; description: string }> =
   { code: "TRANSPORTE", name: "Transporte", description: "Transporte e logística" },
 ];
 
+const LETTER_TEMPLATES: Array<{
+  type: DocumentType;
+  title: string;
+  body: string;
+}> = [
+  {
+    type: "DECLARACAO_MEMBRO",
+    title: "Declaração de Membro",
+    body: `A {igreja}, pessoa jurídica com CNPJ {cnpj}, com sede em {cidade}/{uf}, declara, para os devidos fins, que {nome}, inscrito sob a matrícula n.º {matricula} neste rol de membros, é membro em plena comunhão desta igreja na congregação de {congregacao}, desde {admissao}.`,
+  },
+  {
+    type: "DECLARACAO_VINCULO",
+    title: "Declaração de Vínculo",
+    body: `Declaramos que {nome}, matrícula n.º {matricula}, está vinculado(a) à congregação de {congregacao}, da {igreja}, situada em {cidade}/{uf}.`,
+  },
+  {
+    type: "DECLARACAO_BATISMO",
+    title: "Declaração de Batismo",
+    body: `Declaramos que {nome}, matrícula n.º {matricula}, foi batizado(a) nas águas em {batismo}, nesta igreja, conforme registros desta secretaria.`,
+  },
+  {
+    type: "TRANSFERENCIA",
+    title: "Carta de Transferência",
+    body: `A {igreja} comunica a transferência do(a) membro {nome}, matrícula n.º {matricula}, residente em {cidade}/{uf}, para a igreja de sua livre escolha.`,
+  },
+  {
+    type: "RECOMENDACAO",
+    title: "Carta de Recomendação",
+    body: `Recomendamos à graça de Deus o(a) irmão(ã) {nome}, matrícula n.º {matricula}, membro desta igreja, rogando seja recebido(a) e tratado(a) com amor cristão.`,
+  },
+  {
+    type: "APRESENTACAO",
+    title: "Carta de Apresentação",
+    body: `Apresentamos o(a) irmão(ã) {nome}, matrícula n.º {matricula}, membro da congregação de {congregacao}, desta igreja, declarando que está em plena comunhão com o Corpo.`,
+  },
+  {
+    type: "PERSONALIZADO",
+    title: "Declaração",
+    body: `A {igreja} declara, para os devidos fins, que o(a) portador(a) desta é identificado(a) como {nome}, matrícula n.º {matricula}, da congregação de {congregacao}.`,
+  },
+];
+
 async function seedAuth() {
   for (const role of ROLES) {
     await prisma.role.upsert({
@@ -360,6 +402,16 @@ async function seedCostCenters(churchId: string) {
   }
 }
 
+async function seedTemplates(churchId: string) {
+  const existing = await prisma.letterTemplate.count({ where: { churchId } });
+  if (existing > 0) return;
+  for (const t of LETTER_TEMPLATES) {
+    await prisma.letterTemplate.create({
+      data: { churchId, type: t.type, title: t.title, body: t.body },
+    });
+  }
+}
+
 async function seedAdmin(churchId: string) {
   const email = process.env.SEED_ADMIN_EMAIL;
   const password = process.env.SEED_ADMIN_PASSWORD;
@@ -389,6 +441,7 @@ async function main() {
   const { church, sede, congregacao } = await seedChurch();
   await seedAccounts(church.id);
   await seedCostCenters(church.id);
+  await seedTemplates(church.id);
   await seedAdmin(church.id);
 
   const counts = {
