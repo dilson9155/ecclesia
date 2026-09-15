@@ -39,6 +39,11 @@ export type NavItem = {
   icon?: "dashboard" | "igrejas" | "membros" | "visitantes" | "carteirinhas" | "cartas" | "financeiro" | "contas" | "centrosCusto" | "dizimos" | "ofertas" | "fornecedores" | "entradas" | "saidas" | "livroCaixa" | "fechamento" | "relatorios" | "admin";
 };
 
+export type NavGroup = {
+  title?: string;
+  items: NavItem[];
+};
+
 const NAV_ICONS: Record<NonNullable<NavItem["icon"]>, ReactNode> = {
   dashboard: <LayoutDashboard className="h-4 w-4" />,
   igrejas: <Building2 className="h-4 w-4" />,
@@ -79,36 +84,47 @@ function Brand() {
 }
 
 function NavContent({
-  navItems,
+  groups,
   pathname,
   onNavigate,
 }: {
-  navItems: NavItem[];
+  groups: NavGroup[];
   pathname: string;
   onNavigate?: () => void;
 }) {
   return (
-    <nav className="flex-1 space-y-1 p-2">
-      {navItems.map((item) => {
-        const active =
-          pathname === item.href || pathname.startsWith(`${item.href}/`);
-        return (
-          <Link
-            key={item.key}
-            href={item.href}
-            onClick={onNavigate}
-            className={cn(
-              "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-              active
-                ? "bg-sidebar-primary text-sidebar-primary-foreground"
-                : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-            )}
-          >
-            {item.icon ? NAV_ICONS[item.icon] : null}
-            {item.label}
-          </Link>
-        );
-      })}
+    <nav className="flex-1 overflow-y-auto p-2 space-y-1">
+      {groups.map((group, i) => (
+        <div key={group.title ?? `group-${i}`} className={i > 0 ? "mt-4" : ""}>
+          {group.title && (
+            <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/50">
+              {group.title}
+            </p>
+          )}
+          <div className="space-y-1">
+            {group.items.map((item) => {
+              const active =
+                pathname === item.href || pathname.startsWith(`${item.href}/`);
+              return (
+                <Link
+                  key={item.key}
+                  href={item.href}
+                  onClick={onNavigate}
+                  className={cn(
+                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                    active
+                      ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                      : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  )}
+                >
+                  {item.icon ? NAV_ICONS[item.icon] : null}
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      ))}
     </nav>
   );
 }
@@ -125,11 +141,11 @@ function UserFooter({ userName, userEmail }: { userName: string; userEmail: stri
 }
 
 function Sidebar({
-  navItems,
+  groups,
   userName,
   userEmail,
 }: {
-  navItems: NavItem[];
+  groups: NavGroup[];
   userName: string;
   userEmail: string;
 }) {
@@ -137,7 +153,7 @@ function Sidebar({
   return (
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-sidebar-border bg-sidebar lg:flex">
       <Brand />
-      <NavContent navItems={navItems} pathname={pathname} />
+      <NavContent groups={groups} pathname={pathname} />
       <UserFooter userName={userName} userEmail={userEmail} />
     </aside>
   );
@@ -146,12 +162,12 @@ function Sidebar({
 export function AppShell({
   userName,
   userEmail,
-  navItems,
+  navGroups,
   children,
 }: {
   userName: string;
   userEmail: string;
-  navItems: NavItem[];
+  navGroups: NavGroup[];
   children: ReactNode;
 }) {
   const pathname = usePathname();
@@ -159,7 +175,7 @@ export function AppShell({
 
   return (
     <div className="min-h-dvh bg-background">
-      <Sidebar navItems={navItems} userName={userName} userEmail={userEmail} />
+      <Sidebar groups={navGroups} userName={userName} userEmail={userEmail} />
 
       {mobileOpen && (
         <div className="fixed inset-0 z-40 lg:hidden">
@@ -179,7 +195,7 @@ export function AppShell({
                 <X className="h-5 w-5" />
               </Button>
             </div>
-            <NavContent navItems={navItems} pathname={pathname} onNavigate={() => setMobileOpen(false)} />
+            <NavContent groups={navGroups} pathname={pathname} onNavigate={() => setMobileOpen(false)} />
             <UserFooter userName={userName} userEmail={userEmail} />
           </aside>
         </div>

@@ -43,3 +43,8 @@ prisma/*.db-journal
 
 # logs
 *.log
+
+# vercel
+.vercel
+.env*
+!.env.example
