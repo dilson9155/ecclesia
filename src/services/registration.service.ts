@@ -6,39 +6,18 @@ import { validateField } from "@/modules/registration/validators";
 import { auditLog } from "@/services/audit.service";
 import type { EntryNature, LedgerSource } from "@prisma/client";
 
-type LedgerResource = "dizimos" | "ofertas";
-
-const LEDGER_SOURCE_BY_RESOURCE: Record<LedgerResource, LedgerSource> = {
-  dizimos: "DIZIMO",
-  ofertas: "OFERTA",
-};
-
-function isLedgerResource(resourceKey: string): resourceKey is LedgerResource {
-  return resourceKey === "dizimos" || resourceKey === "ofertas";
-}
-
-function ledgerDataFor(
-  resourceKey: LedgerResource,
-  actor: { userId: string },
-  data: Record<string, unknown>
-) {
-  const isTithe = resourceKey === "dizimos";
-  return {
-    date: data.date as Date,
-    description: isTithe
-      ? `Dízimo${data.isAnonymous ? " (anônimo)" : ""}`
-      : `Oferta${data.type ? ` (${String(data.type).toLowerCase()})` : ""}`,
-    nature: "ENTRADA" as EntryNature,
-    value: data.value as number,
-    accountId: String(data.accountId),
-    accountingCode: String(data.accountingCode),
-    costCenterId: data.costCenterId ? String(data.costCenterId) : null,
-    sourceType: LEDGER_SOURCE_BY_RESOURCE[resourceKey],
-    createdById: actor.userId,
-  };
-}
-
-type ModelKey = "church" | "sede" | "congregation" | "member" | "account" | "costCenter" | "tithe" | "offering";
+type ModelKey =
+  | "church"
+  | "sede"
+  | "congregation"
+  | "member"
+  | "account"
+  | "costCenter"
+  | "tithe"
+  | "offering"
+  | "supplier"
+  | "income"
+  | "expense";
 
 const MODEL_BY_RESOURCE: Record<string, ModelKey> = {
   igrejas: "church",
@@ -49,6 +28,9 @@ const MODEL_BY_RESOURCE: Record<string, ModelKey> = {
   centrosCusto: "costCenter",
   dizimos: "tithe",
   ofertas: "offering",
+  fornecedores: "supplier",
+  entradas: "income",
+  saidas: "expense",
 };
 
 const SORT_BY_MODEL: Record<ModelKey, { field: string; direction: "asc" | "desc" }> = {
@@ -60,7 +42,92 @@ const SORT_BY_MODEL: Record<ModelKey, { field: string; direction: "asc" | "desc"
   costCenter: { field: "code", direction: "asc" },
   tithe: { field: "date", direction: "desc" },
   offering: { field: "date", direction: "desc" },
+  supplier: { field: "name", direction: "asc" },
+  income: { field: "date", direction: "desc" },
+  expense: { field: "date", direction: "desc" },
 };
+
+type LedgerResource = "dizimos" | "ofertas" | "entradas" | "saidas";
+
+const LEDGER_SOURCE_BY_RESOURCE: Record<LedgerResource, LedgerSource> = {
+  dizimos: "DIZIMO",
+  ofertas: "OFERTA",
+  entradas: "ENTRADA",
+  saidas: "SAIDA",
+};
+
+function isLedgerResource(resourceKey: string): resourceKey is LedgerResource {
+  return (
+    resourceKey === "dizimos" ||
+    resourceKey === "ofertas" ||
+    resourceKey === "entradas" ||
+    resourceKey === "saidas"
+  );
+}
+
+function shouldPostLedger(
+  resourceKey: string,
+  existing: Row | null,
+  data: Record<string, unknown>
+): boolean {
+  if (!isLedgerResource(resourceKey)) return false;
+  if (resourceKey !== "saidas") return true;
+  const status =
+    (data.status as string | undefined) ??
+    (existing?.status as string | undefined) ??
+    "PENDENTE";
+  return status === "PAGO";
+}
+
+export async function assertLedgerPeriodOpen(
+  resourceKey: string,
+  data: { date?: unknown; congregationId?: unknown }
+): Promise<void> {
+  if (!isLedgerResource(resourceKey)) return;
+  let date: Date | null = null;
+  if (data.date instanceof Date) date = data.date;
+  else if (data.date) {
+    const d = new Date(String(data.date));
+    if (!Number.isNaN(d.getTime())) date = d;
+  }
+  const congregationId = String(data.congregationId ?? "");
+  if (!date || !congregationId) return;
+  const closing = await prisma.financialClosing.findUnique({
+    where: {
+      congregationId_year_month: {
+        congregationId,
+        year: date.getFullYear(),
+        month: date.getMonth() + 1,
+      },
+    },
+  });
+  if (closing && closing.status === "FECHADO") {
+    throw new Error("Período fechado. Reabra o fechamento para lançar neste mês.");
+  }
+}
+
+function ledgerFromRow(resourceKey: LedgerResource, actor: { userId: string }, row: Row) {
+  let title: string;
+  if (resourceKey === "dizimos") title = "Dízimo";
+  else if (resourceKey === "ofertas") title = "Oferta";
+  else if (resourceKey === "entradas") title = String(row.description ?? "");
+  else title = `Saída: ${String(row.description ?? "")}`;
+  if (resourceKey === "dizimos" && row.isAnonymous) title = `${title} (anônimo)`;
+  if (resourceKey === "ofertas" && row.type) title = `${title} (${String(row.type).toLowerCase()})`;
+
+  return {
+    date: row.date as Date,
+    description: title,
+    nature: (resourceKey === "saidas" ? "SAIDA" : "ENTRADA") as EntryNature,
+    value: row.value as number,
+    accountId: String(row.accountId),
+    accountingCode: String(row.accountingCode),
+    costCenterId: row.costCenterId ? String(row.costCenterId) : null,
+    sourceType: LEDGER_SOURCE_BY_RESOURCE[resourceKey],
+    sourceId: row.id,
+    createdById: actor.userId,
+  };
+}
 
 export type Row = {
   id: string;
@@ -195,6 +262,11 @@ export async function saveRow(
     data.sedeId = congregation.sedeId;
   }
 
+  const countDelegate = prisma[model] as unknown as {
+    count: (args: { where: Record<string, unknown> }) => Promise<number>;
+    aggregate: (args: { where: Record<string, unknown>; _max: Record<string, boolean> }) => Promise<{ _max: Record<string, string | null> }>;
+  };
+
   if (resourceKey === "contas") {
     if (!data.accountingCode) throw new Error("Campo obrigatório: Código contábil");
     if (data.parentId === "") data.parentId = null;
@@ -205,7 +277,7 @@ export async function saveRow(
     if (data.congregationId === "") data.congregationId = null;
   }
 
-  if (resourceKey === "dizimos") {
+  if (resourceKey === "dizimos" || resourceKey === "ofertas") {
     const congregationId = String(data.congregationId ?? "");
     if (!congregationId) throw new Error("Campo obrigatório: Congregação");
     if (!data.accountId) throw new Error("Campo obrigatório: Conta contábil");
@@ -213,17 +285,33 @@ export async function saveRow(
     if (data.costCenterId === "") data.costCenterId = null;
     if (!data.accountingCode) data.accountingCode = data.accountId;
     if (!data.paymentMethod) data.paymentMethod = "DINHEIRO";
+    if (resourceKey === "ofertas" && !data.type) data.type = "CULTO";
   }
 
-  if (resourceKey === "ofertas") {
+  if (resourceKey === "entradas" || resourceKey === "saidas") {
     const congregationId = String(data.congregationId ?? "");
     if (!congregationId) throw new Error("Campo obrigatório: Congregação");
     if (!data.accountId) throw new Error("Campo obrigatório: Conta contábil");
-    if (data.memberId === "") data.memberId = null;
-    if (data.costCenterId === "") data.costCenterId = null;
+    if (!data.code) {
+      const agg = await countDelegate.aggregate({
+        where: { congregationId },
+        _max: { code: true },
+      });
+      const maxCode = agg._max.code;
+      data.code = maxCode
+        ? String(Number(maxCode) + 1).padStart(4, "0")
+        : "0001";
+    }
     if (!data.accountingCode) data.accountingCode = data.accountId;
     if (!data.paymentMethod) data.paymentMethod = "DINHEIRO";
-    if (!data.type) data.type = "CULTO";
+    if (data.costCenterId === "") data.costCenterId = null;
+    if (resourceKey === "saidas" && data.supplierId === "") data.supplierId = null;
+  }
+
+  if (resourceKey === "fornecedores") {
+    if (data.cpfCnpj === "") data.cpfCnpj = null;
+    if (data.pix === "") data.pix = null;
+    if (data.pixKeyType === "") data.pixKeyType = null;
   }
 
   const delegate = prisma[model] as unknown as {
@@ -236,9 +324,22 @@ export async function saveRow(
   };
 
   const scopedWhere = scopeFilter(resourceKey, actor.churchId);
-  const ledger = isLedgerResource(resourceKey)
-    ? ledgerDataFor(resourceKey, actor, data)
-    : null;
+  const ledgerResource = isLedgerResource(resourceKey) ? resourceKey : null;
+
+  let existing: Row | null = null;
+  if (id) {
+    const found = await delegate.findUnique({ where: { id } });
+    if (!found) throw new Error("Registro não encontrado.");
+    if (scopedWhere.id && found.id !== scopedWhere.id) {
+      throw new Error("Registro não pertence à sua igreja.");
+    }
+    if (scopedWhere.churchId && found.churchId !== scopedWhere.churchId) {
+      throw new Error("Registro não pertence à sua igreja.");
+    }
+    existing = found;
+  }
+
+  await assertLedgerPeriodOpen(resourceKey, data);
 
   async function saveLedgerRow(tx: {
     [key: string]: unknown;
@@ -254,39 +355,25 @@ export async function saveRow(
       deleteMany: (args: { where: Record<string, unknown> }) => Promise<void>;
       create: (args: { data: Record<string, unknown> }) => Promise<Row>;
     };
-    let row: Row;
-    if (id) {
-      row = await txDelegate.update({ where: { id }, data });
-      await cashEntry.deleteMany({
-        where: {
-          sourceType: LEDGER_SOURCE_BY_RESOURCE[resourceKey as LedgerResource],
-          sourceId: row.id,
+    const row = id
+      ? await txDelegate.update({ where: { id }, data })
+      : await txDelegate.create({ data });
+    const sourceType = LEDGER_SOURCE_BY_RESOURCE[resourceKey as LedgerResource];
+    await cashEntry.deleteMany({ where: { sourceType, sourceId: row.id } });
+    if (shouldPostLedger(resourceKey, existing, data)) {
+      await cashEntry.create({
+        data: {
+          churchId: actor.churchId,
+          congregationId: String(row.congregationId),
+          ...ledgerFromRow(resourceKey as LedgerResource, actor, row),
         },
       });
-    } else {
-      row = await txDelegate.create({ data });
     }
-    await cashEntry.create({
-      data: {
-        churchId: actor.churchId,
-        congregationId: String(data.congregationId),
-        ...(ledger as Record<string, unknown>),
-        sourceId: row.id,
-      },
-    });
     return row;
   }
 
   if (id) {
-    const existing = await delegate.findUnique({ where: { id } });
-    if (!existing) throw new Error("Registro não encontrado.");
-    if (scopedWhere.id && existing.id !== scopedWhere.id) {
-      throw new Error("Registro não pertence à sua igreja.");
-    }
-    if (scopedWhere.churchId && existing.churchId !== scopedWhere.churchId) {
-      throw new Error("Registro não pertence à sua igreja.");
-    }
-    const updated = ledger
+    const updated = ledgerResource
       ? await prisma.$transaction((tx) => saveLedgerRow(tx))
       : await delegate.update({ where: { id }, data });
     await auditLog({
@@ -302,7 +389,7 @@ export async function saveRow(
     return updated;
   }
 
-  const created = ledger
+  const created = ledgerResource
     ? await prisma.$transaction((tx) => saveLedgerRow(tx))
     : await delegate.create({ data });
   await auditLog({
@@ -341,11 +428,20 @@ export async function deleteRow(
     throw new Error("Registro não pertence à sua igreja.");
   }
 
-  if (isLedgerResource(resourceKey)) {
-    await prisma.$transaction(async (tx) => {
-      const txDelegate = tx[model] as unknown as {
-        delete: (args: { where: { id: string } }) => Promise<Row>;
-      };
+  if (resourceKey === "saidas" && existing.status === "PAGO") {
+    throw new Error("Saída paga não pode ser excluída. Cancele antes.");
+  }
+
+  await assertLedgerPeriodOpen(resourceKey, {
+    date: existing.date as Date,
+    congregationId: existing.congregationId,
+  });
+
+  await prisma.$transaction(async (tx) => {
+    const txDelegate = tx[model] as unknown as {
+      delete: (args: { where: { id: string } }) => Promise<Row>;
+    };
+    if (isLedgerResource(resourceKey)) {
       const cashEntry = tx.cashEntry as unknown as {
         deleteMany: (args: { where: Record<string, unknown> }) => Promise<void>;
       };
@@ -355,11 +451,9 @@ export async function deleteRow(
           sourceId: id,
         },
       });
-      await txDelegate.delete({ where: { id } });
-    });
-  } else {
-    await delegate.delete({ where: { id } });
-  }
+    }
+    await txDelegate.delete({ where: { id } });
+  });
 
   await auditLog({
     userId: actor.userId,

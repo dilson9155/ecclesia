@@ -74,6 +74,41 @@ const NAV_ITEMS: NavEntry[] = [
     icon: "ofertas",
     permission: "ofertas.view",
   },
+  {
+    key: "fornecedores",
+    label: "Fornecedores",
+    href: "/fornecedores",
+    icon: "fornecedores",
+    permission: "fornecedores.view",
+  },
+  {
+    key: "entradas",
+    label: "Entradas",
+    href: "/entradas",
+    icon: "entradas",
+    permission: "entradas.view",
+  },
+  {
+    key: "saidas",
+    label: "Saídas",
+    href: "/saidas",
+    icon: "saidas",
+    permission: "saidas.view",
+  },
+  {
+    key: "livro-caixa",
+    label: "Livro Caixa",
+    href: "/livro-caixa",
+    icon: "livroCaixa",
+    permission: "livroCaixa.view",
+  },
+  {
+    key: "fechamento",
+    label: "Fechamento",
+    href: "/fechamento",
+    icon: "fechamento",
+    permission: "fechamento.view",
+  },
 ];
 
 export default async function AppLayout({ children }: { children: ReactNode }) {

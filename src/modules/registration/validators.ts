@@ -10,6 +10,8 @@ const VALIDATORS: Record<string, FieldValidator> = {
   "membros.cpf": (v) => (v && !isValidCpf(v) ? "CPF inválido." : null),
   "dizimos.value": (v) => (Number(v) <= 0 ? "O valor deve ser maior que zero." : null),
   "ofertas.value": (v) => (Number(v) <= 0 ? "O valor deve ser maior que zero." : null),
+  "entradas.value": (v) => (Number(v) <= 0 ? "O valor deve ser maior que zero." : null),
+  "saidas.value": (v) => (Number(v) <= 0 ? "O valor deve ser maior que zero." : null),
 };
 
 const DISPLAYS: Record<string, FieldDisplay> = {
@@ -18,6 +20,8 @@ const DISPLAYS: Record<string, FieldDisplay> = {
     v ? "Convertido" : "Pendente",
   "dizimos.value": (v) => (v === null || v === undefined || v === "" ? null : formatMoney(v, true)),
   "ofertas.value": (v) => (v === null || v === undefined || v === "" ? null : formatMoney(v, true)),
+  "entradas.value": (v) => (v === null || v === undefined || v === "" ? null : formatMoney(v, true)),
+  "saidas.value": (v) => (v === null || v === undefined || v === "" ? null : formatMoney(v, true)),
   "dizimos.isAnonymous": (v) => (v === true || v === "true" ? "Anônimo" : null),
   "ofertas.isAnonymous": (v) => (v === true || v === "true" ? "Anônimo" : null),
 };

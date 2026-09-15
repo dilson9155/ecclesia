@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Building2,
+  BookText,
   Church,
   CreditCard,
   FileText,
@@ -13,11 +14,15 @@ import {
   HandCoins,
   Landmark,
   LayoutDashboard,
+  Lock,
   LogOut,
   Menu,
   ScrollText,
   Settings,
   Tags,
+  TrendingDown,
+  TrendingUp,
+  Truck,
   UserPlus,
   Users,
   Wallet,
@@ -31,7 +36,7 @@ export type NavItem = {
   key: string;
   label: string;
   href: string;
-  icon?: "dashboard" | "igrejas" | "membros" | "visitantes" | "carteirinhas" | "cartas" | "financeiro" | "contas" | "centrosCusto" | "dizimos" | "ofertas" | "relatorios" | "admin";
+  icon?: "dashboard" | "igrejas" | "membros" | "visitantes" | "carteirinhas" | "cartas" | "financeiro" | "contas" | "centrosCusto" | "dizimos" | "ofertas" | "fornecedores" | "entradas" | "saidas" | "livroCaixa" | "fechamento" | "relatorios" | "admin";
 };
 
 const NAV_ICONS: Record<NonNullable<NavItem["icon"]>, ReactNode> = {
@@ -46,6 +51,11 @@ const NAV_ICONS: Record<NonNullable<NavItem["icon"]>, ReactNode> = {
   centrosCusto: <Tags className="h-4 w-4" />,
   dizimos: <HandCoins className="h-4 w-4" />,
   ofertas: <Gift className="h-4 w-4" />,
+  fornecedores: <Truck className="h-4 w-4" />,
+  entradas: <TrendingUp className="h-4 w-4" />,
+  saidas: <TrendingDown className="h-4 w-4" />,
+  livroCaixa: <BookText className="h-4 w-4" />,
+  fechamento: <Lock className="h-4 w-4" />,
   relatorios: <FileText className="h-4 w-4" />,
   admin: <Settings className="h-4 w-4" />,
 };

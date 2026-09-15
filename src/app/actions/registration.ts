@@ -16,6 +16,9 @@ const STANDALONE_PATHS: Record<string, string> = {
   centrosCusto: "/centros-custo",
   dizimos: "/dizimos",
   ofertas: "/ofertas",
+  fornecedores: "/fornecedores",
+  entradas: "/entradas",
+  saidas: "/saidas",
 };
 
 function resourcePaths(resourceKey: string): string[] {

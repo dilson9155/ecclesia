@@ -1,0 +1,39 @@
+import { getResource } from "@/modules/registration/definitions";
+import { requirePermission, can } from "@/lib/rbac";
+import { listRows, getRelationOptions } from "@/services/registration.service";
+import { CrudManager } from "@/components/crud/crud-manager";
+
+export const dynamic = "force-dynamic";
+
+export default async function FornecedoresPage() {
+  const def = getResource("fornecedores");
+  if (!def) return null;
+
+  const user = await requirePermission(def.viewPermission);
+  if (!user.churchId) return null;
+
+  const [rows, relationOptions] = await Promise.all([
+    listRows("fornecedores", user.churchId),
+    getRelationOptions("fornecedores", user.churchId),
+  ]);
+
+  const canWrite =
+    (await can(user, def.createPermission)) ||
+    (await can(user, def.editPermission)) ||
+    (await can(user, def.deletePermission));
+
+  return (
+    <div className="space-y-6">
+      <CrudManager
+        resourceKey={def.key}
+        singular={def.singular}
+        plural={def.plural}
+        description={def.description}
+        fields={def.fields}
+        rows={rows}
+        canWrite={canWrite}
+        relationOptions={relationOptions}
+      />
+    </div>
+  );
+}
