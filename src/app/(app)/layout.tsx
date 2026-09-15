@@ -46,6 +46,34 @@ const NAV_ITEMS: NavEntry[] = [
     icon: "cartas",
     permission: "cartas.view",
   },
+  {
+    key: "plano-contas",
+    label: "Plano de Contas",
+    href: "/plano-contas",
+    icon: "contas",
+    permission: "planoContas.view",
+  },
+  {
+    key: "centros-custo",
+    label: "Centros de Custo",
+    href: "/centros-custo",
+    icon: "centrosCusto",
+    permission: "centrosCusto.view",
+  },
+  {
+    key: "dizimos",
+    label: "Dízimos",
+    href: "/dizimos",
+    icon: "dizimos",
+    permission: "dizimos.view",
+  },
+  {
+    key: "ofertas",
+    label: "Ofertas",
+    href: "/ofertas",
+    icon: "ofertas",
+    permission: "ofertas.view",
+  },
 ];
 
 export default async function AppLayout({ children }: { children: ReactNode }) {

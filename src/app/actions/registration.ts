@@ -9,6 +9,20 @@ import { requirePermission } from "@/lib/rbac";
 import { saveRow, deleteRow } from "@/services/registration.service";
 import { runRowAction } from "@/services/actions.service";
 
+const STANDALONE_PATHS: Record<string, string> = {
+  membros: "/membros",
+  visitantes: "/visitantes",
+  contas: "/plano-contas",
+  centrosCusto: "/centros-custo",
+  dizimos: "/dizimos",
+  ofertas: "/ofertas",
+};
+
+function resourcePaths(resourceKey: string): string[] {
+  const standalone = STANDALONE_PATHS[resourceKey];
+  return standalone ? [standalone] : [`/estrutura/${resourceKey}`];
+}
+
 async function authorize(def: ResourceDef, operation: "create" | "update" | "delete") {
   const permission =
     operation === "create"
@@ -30,7 +44,7 @@ export async function createRecord(resourceKey: string, values: Record<string, u
   } catch (error) {
     return { ok: false, error: (error as Error).message };
   }
-  revalidatePath(`/estrutura/${resourceKey}`);
+  for (const p of resourcePaths(resourceKey)) revalidatePath(p);
   return { ok: true };
 }
 
@@ -44,7 +58,7 @@ export async function updateRecord(resourceKey: string, id: string, values: Reco
   } catch (error) {
     return { ok: false, error: (error as Error).message };
   }
-  revalidatePath(`/estrutura/${resourceKey}`);
+  for (const p of resourcePaths(resourceKey)) revalidatePath(p);
   return { ok: true };
 }
 
@@ -58,7 +72,7 @@ export async function removeRecord(resourceKey: string, id: string) {
   } catch (error) {
     return { ok: false, error: (error as Error).message };
   }
-  revalidatePath(`/estrutura/${resourceKey}`);
+  for (const p of resourcePaths(resourceKey)) revalidatePath(p);
   return { ok: true };
 }
 

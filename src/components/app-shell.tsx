@@ -9,11 +9,15 @@ import {
   Church,
   CreditCard,
   FileText,
+  Gift,
+  HandCoins,
+  Landmark,
   LayoutDashboard,
   LogOut,
   Menu,
   ScrollText,
   Settings,
+  Tags,
   UserPlus,
   Users,
   Wallet,
@@ -27,7 +31,7 @@ export type NavItem = {
   key: string;
   label: string;
   href: string;
-  icon?: "dashboard" | "igrejas" | "membros" | "visitantes" | "carteirinhas" | "cartas" | "financeiro" | "relatorios" | "admin";
+  icon?: "dashboard" | "igrejas" | "membros" | "visitantes" | "carteirinhas" | "cartas" | "financeiro" | "contas" | "centrosCusto" | "dizimos" | "ofertas" | "relatorios" | "admin";
 };
 
 const NAV_ICONS: Record<NonNullable<NavItem["icon"]>, ReactNode> = {
@@ -38,6 +42,10 @@ const NAV_ICONS: Record<NonNullable<NavItem["icon"]>, ReactNode> = {
   carteirinhas: <CreditCard className="h-4 w-4" />,
   cartas: <ScrollText className="h-4 w-4" />,
   financeiro: <Wallet className="h-4 w-4" />,
+  contas: <Landmark className="h-4 w-4" />,
+  centrosCusto: <Tags className="h-4 w-4" />,
+  dizimos: <HandCoins className="h-4 w-4" />,
+  ofertas: <Gift className="h-4 w-4" />,
   relatorios: <FileText className="h-4 w-4" />,
   admin: <Settings className="h-4 w-4" />,
 };

@@ -12,6 +12,7 @@ import {
   runRowActionById,
 } from "@/app/actions/registration";
 import { buildFormDefaults, fillEmptyFields } from "@/lib/form-utils";
+import { formatMoney } from "@/lib/format";
 import { SELECT_INPUT_CLASS } from "@/lib/styles";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -72,6 +73,14 @@ function formatValue(
   if (custom !== null) return custom;
   if (field.type === "select") {
     return optionLabel(field, value) ?? (value === null || value === undefined ? "—" : String(value));
+  }
+  if (field.type === "decimal") {
+    return value === null || value === undefined || value === ""
+      ? "—"
+      : formatMoney(value, true);
+  }
+  if (field.type === "checkbox") {
+    return value === true || value === "true" ? "Sim" : "Não";
   }
   if (field.type === "relation") {
     if (value === null || value === undefined || value === "") return "—";

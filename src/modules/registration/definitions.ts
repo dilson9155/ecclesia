@@ -5,7 +5,7 @@ export type { Option };
 export type FieldDef = {
   key: string;
   label: string;
-  type: "text" | "select" | "relation" | "checkbox" | "date" | "textarea";
+  type: "text" | "select" | "relation" | "checkbox" | "date" | "textarea" | "decimal";
   required?: boolean;
   readonly?: boolean;
   options?: Option[];
@@ -59,6 +59,49 @@ export const MARITAL_STATUS_OPTIONS: Option[] = [
   { value: "DIVORCIADO", label: "Divorciado(a)" },
   { value: "VIUVO", label: "Viúvo(a)" },
   { value: "UNIAO_ESTAVEL", label: "União estável" },
+];
+
+export const PAYMENT_METHOD_OPTIONS: Option[] = [
+  { value: "DINHEIRO", label: "Dinheiro" },
+  { value: "PIX", label: "PIX" },
+  { value: "CARTAO", label: "Cartão" },
+  { value: "TRANSFERENCIA", label: "Transferência" },
+  { value: "DEPOSITO", label: "Depósito" },
+  { value: "BOLETO", label: "Boleto" },
+  { value: "OUTROS", label: "Outros" },
+];
+
+export const OFFERING_TYPE_OPTIONS: Option[] = [
+  { value: "CULTO", label: "Culto" },
+  { value: "MISSOES", label: "Missões" },
+  { value: "CONSTRUCAO", label: "Construção" },
+  { value: "EVENTOS", label: "Eventos" },
+  { value: "DEPARTAMENTO", label: "Departamento" },
+  { value: "ESPECIAL", label: "Especial" },
+  { value: "OUTROS", label: "Outros" },
+];
+
+export const EXPENSE_STATUS_OPTIONS: Option[] = [
+  { value: "PENDENTE", label: "Pendente" },
+  { value: "PAGO", label: "Pago" },
+  { value: "CANCELADO", label: "Cancelado" },
+];
+
+export const ACCOUNT_NATURE_OPTIONS: Option[] = [
+  { value: "RECEITA", label: "Receita" },
+  { value: "DESPESA", label: "Despesa" },
+];
+
+export const ENTRY_NATURE_OPTIONS: Option[] = [
+  { value: "ENTRADA", label: "Entrada" },
+  { value: "SAIDA", label: "Saída" },
+];
+
+export const LEDGER_SOURCE_OPTIONS: Option[] = [
+  { value: "DIZIMO", label: "Dízimo" },
+  { value: "OFERTA", label: "Oferta" },
+  { value: "ENTRADA", label: "Entrada" },
+  { value: "SAIDA", label: "Saída" },
 ];
 
 export const RESOURCES: ResourceDef[] = [
@@ -228,6 +271,175 @@ export const RESOURCES: ResourceDef[] = [
         type: "text",
         readonly: true,
       },
+    ],
+  },
+  {
+    key: "contas",
+    singular: "Conta",
+    plural: "Contas",
+    description: "Plano de contas contábil da igreja",
+    viewPermission: "planoContas.view",
+    createPermission: "planoContas.create",
+    editPermission: "planoContas.edit",
+    deletePermission: "planoContas.delete",
+    canCreate: true,
+    canDelete: true,
+    standalone: true,
+    fields: [
+      { key: "code", label: "Código", type: "text", required: true, hint: "Ex.: 1.01.001" },
+      { key: "name", label: "Nome", type: "text", required: true },
+      {
+        key: "nature",
+        label: "Natureza",
+        type: "select",
+        required: true,
+        options: ACCOUNT_NATURE_OPTIONS,
+      },
+      {
+        key: "parentId",
+        label: "Conta pai",
+        type: "relation",
+        relation: { resourceKey: "contas", valueField: "id", labelField: "name" },
+      },
+      { key: "description", label: "Descrição", type: "text" },
+      { key: "status", label: "Situação", type: "select", options: STATUS_OPTIONS },
+    ],
+  },
+  {
+    key: "centrosCusto",
+    singular: "Centro de Custo",
+    plural: "Centros de Custo",
+    description: "Centros de custo para rateio de despesas",
+    viewPermission: "centrosCusto.view",
+    createPermission: "centrosCusto.create",
+    editPermission: "centrosCusto.edit",
+    deletePermission: "centrosCusto.delete",
+    canCreate: true,
+    canDelete: true,
+    standalone: true,
+    fields: [
+      { key: "code", label: "Código", type: "text", required: true, hint: "Ex.: ADM" },
+      { key: "name", label: "Nome", type: "text", required: true },
+      { key: "description", label: "Descrição", type: "text" },
+      {
+        key: "congregationId",
+        label: "Congregação",
+        type: "relation",
+        relation: { resourceKey: "congregacoes", valueField: "id", labelField: "name" },
+      },
+      { key: "status", label: "Situação", type: "select", options: STATUS_OPTIONS },
+    ],
+  },
+  {
+    key: "dizimos",
+    singular: "Dízimo",
+    plural: "Dízimos",
+    description: "Lançamento de dízimos com vínculo a membro e centro de custo",
+    viewPermission: "dizimos.view",
+    createPermission: "dizimos.create",
+    editPermission: "dizimos.edit",
+    deletePermission: "dizimos.cancel",
+    canCreate: true,
+    canDelete: true,
+    standalone: true,
+    fields: [
+      {
+        key: "congregationId",
+        label: "Congregação",
+        type: "relation",
+        required: true,
+        relation: { resourceKey: "congregacoes", valueField: "id", labelField: "name" },
+      },
+      {
+        key: "memberId",
+        label: "Membro (opcional)",
+        type: "relation",
+        relation: { resourceKey: "membros", valueField: "id", labelField: "name" },
+      },
+      { key: "date", label: "Data", type: "date", required: true },
+      { key: "value", label: "Valor", type: "decimal", required: true },
+      {
+        key: "paymentMethod",
+        label: "Forma de pagamento",
+        type: "select",
+        required: true,
+        options: PAYMENT_METHOD_OPTIONS,
+      },
+      {
+        key: "costCenterId",
+        label: "Centro de custo",
+        type: "relation",
+        relation: { resourceKey: "centrosCusto", valueField: "id", labelField: "name" },
+      },
+      {
+        key: "accountId",
+        label: "Conta contábil",
+        type: "relation",
+        required: true,
+        relation: { resourceKey: "contas", valueField: "id", labelField: "name" },
+      },
+      { key: "observation", label: "Observação", type: "text" },
+      { key: "isAnonymous", label: "Anônimo", type: "checkbox" },
+    ],
+  },
+  {
+    key: "ofertas",
+    singular: "Oferta",
+    plural: "Ofertas",
+    description: "Lançamento de ofertas por tipo, membro e centro de custo",
+    viewPermission: "ofertas.view",
+    createPermission: "ofertas.create",
+    editPermission: "ofertas.edit",
+    deletePermission: "ofertas.cancel",
+    canCreate: true,
+    canDelete: true,
+    standalone: true,
+    fields: [
+      {
+        key: "congregationId",
+        label: "Congregação",
+        type: "relation",
+        required: true,
+        relation: { resourceKey: "congregacoes", valueField: "id", labelField: "name" },
+      },
+      {
+        key: "memberId",
+        label: "Membro (opcional)",
+        type: "relation",
+        relation: { resourceKey: "membros", valueField: "id", labelField: "name" },
+      },
+      { key: "contributor", label: "Contribuinte (avulso)", type: "text" },
+      {
+        key: "type",
+        label: "Tipo de oferta",
+        type: "select",
+        required: true,
+        options: OFFERING_TYPE_OPTIONS,
+      },
+      { key: "date", label: "Data", type: "date", required: true },
+      { key: "value", label: "Valor", type: "decimal", required: true },
+      {
+        key: "paymentMethod",
+        label: "Forma de pagamento",
+        type: "select",
+        required: true,
+        options: PAYMENT_METHOD_OPTIONS,
+      },
+      {
+        key: "costCenterId",
+        label: "Centro de custo",
+        type: "relation",
+        relation: { resourceKey: "centrosCusto", valueField: "id", labelField: "name" },
+      },
+      {
+        key: "accountId",
+        label: "Conta contábil",
+        type: "relation",
+        required: true,
+        relation: { resourceKey: "contas", valueField: "id", labelField: "name" },
+      },
+      { key: "observation", label: "Observação", type: "text" },
+      { key: "isAnonymous", label: "Anônimo", type: "checkbox" },
     ],
   },
 ];
