@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { getResource } from "@/modules/registration/definitions";
 import { requirePermission, can } from "@/lib/rbac";
 import { listRows, getRelationOptions } from "@/services/registration.service";
+import { scopeFromUser } from "@/lib/scope";
 import { CrudManager } from "@/components/crud/crud-manager";
 
 export const dynamic = "force-dynamic";
@@ -19,8 +20,8 @@ export default async function ResourcePage({
   if (!user.churchId) notFound();
 
   const [rows, relationOptions] = await Promise.all([
-    listRows(resource, user.churchId),
-    getRelationOptions(resource, user.churchId),
+    listRows(resource, scopeFromUser(user)),
+    getRelationOptions(resource, scopeFromUser(user)),
   ]);
 
   const canWrite =

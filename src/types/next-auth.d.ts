@@ -8,6 +8,7 @@ declare module "next-auth" {
       roles: string[];
       permissions: string[];
       churchId?: string | null;
+      sedeId?: string | null;
       congregationId?: string | null;
     } & DefaultSession["user"];
   }
@@ -16,6 +17,7 @@ declare module "next-auth" {
     roles?: string[];
     permissions?: string[];
     churchId?: string | null;
+    sedeId?: string | null;
     congregationId?: string | null;
   }
 }
@@ -25,6 +27,7 @@ declare module "next-auth/jwt" {
     roles: string[];
     permissions: string[];
     churchId?: string | null;
+    sedeId?: string | null;
     congregationId?: string | null;
   }
 }
@@ -36,5 +39,6 @@ export type SessionUser = {
   roles: string[];
   permissions: string[];
   churchId?: string | null;
+  sedeId?: string | null;
   congregationId?: string | null;
 };

@@ -8,6 +8,7 @@ import type { ResourceDef } from "@/modules/registration/definitions";
 import { requirePermission } from "@/lib/rbac";
 import { saveRow, deleteRow } from "@/services/registration.service";
 import { runRowAction } from "@/services/actions.service";
+import { scopeFromUser } from "@/lib/scope";
 
 const STANDALONE_PATHS: Record<string, string> = {
   membros: "/membros",
@@ -43,7 +44,7 @@ export async function createRecord(resourceKey: string, values: Record<string, u
   const user = await authorize(def, "create");
   if (!user.churchId) return { ok: false, error: "Nenhuma igreja vinculada ao seu usuário." };
   try {
-    await saveRow(resourceKey, { userId: user.id, churchId: user.churchId }, values, null);
+    await saveRow(resourceKey, { userId: user.id, scope: scopeFromUser(user) }, values, null);
   } catch (error) {
     return { ok: false, error: (error as Error).message };
   }
@@ -57,7 +58,7 @@ export async function updateRecord(resourceKey: string, id: string, values: Reco
   const user = await authorize(def, "update");
   if (!user.churchId) return { ok: false, error: "Nenhuma igreja vinculada ao seu usuário." };
   try {
-    await saveRow(resourceKey, { userId: user.id, churchId: user.churchId }, values, id);
+    await saveRow(resourceKey, { userId: user.id, scope: scopeFromUser(user) }, values, id);
   } catch (error) {
     return { ok: false, error: (error as Error).message };
   }
@@ -71,7 +72,7 @@ export async function removeRecord(resourceKey: string, id: string) {
   const user = await authorize(def, "delete");
   if (!user.churchId) return { ok: false, error: "Nenhuma igreja vinculada ao seu usuário." };
   try {
-    await deleteRow(resourceKey, { userId: user.id, churchId: user.churchId }, id);
+    await deleteRow(resourceKey, { userId: user.id, scope: scopeFromUser(user) }, id);
   } catch (error) {
     return { ok: false, error: (error as Error).message };
   }
@@ -86,7 +87,7 @@ export async function runRowActionById(resourceKey: string, actionKey: string, i
   const user = await requirePermission(action.permission);
   if (!user.churchId) return { ok: false, error: "Nenhuma igreja vinculada ao seu usuário." };
   try {
-    await runRowAction(resourceKey, actionKey, { userId: user.id, churchId: user.churchId }, id);
+    await runRowAction(resourceKey, actionKey, { userId: user.id, scope: scopeFromUser(user) }, id);
   } catch (error) {
     return { ok: false, error: (error as Error).message };
   }

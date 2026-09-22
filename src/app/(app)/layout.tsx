@@ -43,6 +43,7 @@ const NAV_GROUPS: Array<{ title?: string; items: NavEntry[] }> = [
     title: "Sistema",
     items: [
       { key: "estrutura", label: "Estrutura", href: "/estrutura", icon: "igrejas", permission: "igrejas.view" },
+      { key: "usuarios", label: "Usuários", href: "/usuarios", icon: "usuarios", permission: "usuarios.view" },
     ],
   },
 ];

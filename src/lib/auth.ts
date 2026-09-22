@@ -68,6 +68,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           roles,
           permissions,
           churchId: user.churchId,
+          sedeId: user.sedeId,
           congregationId: user.congregationId,
         };
       },
@@ -79,6 +80,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.roles = user.roles ?? [];
         token.permissions = user.permissions ?? [];
         token.churchId = user.churchId ?? null;
+        token.sedeId = user.sedeId ?? null;
         token.congregationId = user.congregationId ?? null;
       }
       return token;
@@ -89,6 +91,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.roles = token.roles ?? [];
         session.user.permissions = token.permissions ?? [];
         session.user.churchId = token.churchId ?? null;
+        session.user.sedeId = token.sedeId ?? null;
         session.user.congregationId = token.congregationId ?? null;
       }
       return session;

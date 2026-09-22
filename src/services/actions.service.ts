@@ -1,14 +1,19 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { auditLog } from "@/services/audit.service";
-import { assertLedgerPeriodOpen } from "@/services/registration.service";
-
-export type Actor = { userId: string; churchId: string };
+import {
+  assertLedgerPeriodOpen,
+  type Actor,
+} from "@/services/registration.service";
+import { assertCongregationInScope } from "@/lib/scope";
 
 async function convertVisitor(actor: Actor, id: string) {
+  const churchId = actor.scope.churchId;
+  if (!churchId) throw new Error("Nenhuma igreja vinculada ao seu usuário.");
   const visitor = await prisma.visitor.findUnique({ where: { id } });
   if (!visitor) throw new Error("Visitante não encontrado.");
-  if (visitor.churchId !== actor.churchId) {
+  await assertCongregationInScope(actor.scope, visitor.congregationId);
+  if (visitor.churchId !== churchId) {
     throw new Error("Registro não pertence à sua igreja.");
   }
   if (visitor.convertedToMemberId) {
@@ -26,7 +31,7 @@ async function convertVisitor(actor: Actor, id: string) {
 
   const member = await prisma.member.create({
     data: {
-      churchId: actor.churchId,
+      churchId,
       congregationId: congregation.id,
       sedeId: congregation.sedeId,
       code: String(memberCount + 1).padStart(4, "0"),
@@ -45,7 +50,7 @@ async function convertVisitor(actor: Actor, id: string) {
 
   await auditLog({
     userId: actor.userId,
-    churchId: actor.churchId,
+    churchId: actor.scope.churchId,
     action: "CREATE",
     module: "membros",
     entity: "Membro",
@@ -55,7 +60,7 @@ async function convertVisitor(actor: Actor, id: string) {
   });
   await auditLog({
     userId: actor.userId,
-    churchId: actor.churchId,
+    churchId: actor.scope.churchId,
     action: "UPDATE",
     module: "visitantes",
     entity: "Visitante",
@@ -67,9 +72,13 @@ async function convertVisitor(actor: Actor, id: string) {
 }
 
 async function baixarSaida(actor: Actor, id: string) {
+  const churchId = actor.scope.churchId;
+  if (!churchId) throw new Error("Nenhuma igreja vinculada ao seu usuário.");
   const expense = await prisma.expense.findUnique({ where: { id } });
-  if (!expense || expense.churchId !== actor.churchId) {
-    throw new Error("Saída não encontrada.");
+  if (!expense) throw new Error("Saída não encontrada.");
+  await assertCongregationInScope(actor.scope, expense.congregationId);
+  if (expense.churchId !== churchId) {
+    throw new Error("Saída não pertence à sua igreja.");
   }
   if (expense.status === "PAGO") throw new Error("Esta saída já foi baixada.");
   if (expense.status === "CANCELADO") {
@@ -87,7 +96,7 @@ async function baixarSaida(actor: Actor, id: string) {
     await tx.cashEntry.deleteMany({ where: { sourceType: "SAIDA", sourceId: updated.id } });
     await tx.cashEntry.create({
       data: {
-        churchId: actor.churchId,
+        churchId,
         congregationId: updated.congregationId,
         date: updated.date,
         description: `Saída: ${updated.description}`,
@@ -104,7 +113,7 @@ async function baixarSaida(actor: Actor, id: string) {
   });
   await auditLog({
     userId: actor.userId,
-    churchId: actor.churchId,
+    churchId: actor.scope.churchId,
     action: "UPDATE",
     module: "saidas",
     entity: "Saída",
@@ -116,9 +125,13 @@ async function baixarSaida(actor: Actor, id: string) {
 }
 
 async function cancelarSaida(actor: Actor, id: string) {
+  const churchId = actor.scope.churchId;
+  if (!churchId) throw new Error("Nenhuma igreja vinculada ao seu usuário.");
   const expense = await prisma.expense.findUnique({ where: { id } });
-  if (!expense || expense.churchId !== actor.churchId) {
-    throw new Error("Saída não encontrada.");
+  if (!expense) throw new Error("Saída não encontrada.");
+  await assertCongregationInScope(actor.scope, expense.congregationId);
+  if (expense.churchId !== churchId) {
+    throw new Error("Saída não pertence à sua igreja.");
   }
   if (expense.status === "CANCELADO") {
     throw new Error("Esta saída já foi cancelada.");
@@ -136,7 +149,7 @@ async function cancelarSaida(actor: Actor, id: string) {
   });
   await auditLog({
     userId: actor.userId,
-    churchId: actor.churchId,
+    churchId: actor.scope.churchId,
     action: "CANCEL",
     module: "saidas",
     entity: "Saída",

@@ -1,6 +1,7 @@
 import { getResource } from "@/modules/registration/definitions";
 import { requirePermission, can } from "@/lib/rbac";
 import { listRows, getRelationOptions } from "@/services/registration.service";
+import { scopeFromUser } from "@/lib/scope";
 import { CrudManager } from "@/components/crud/crud-manager";
 
 export const dynamic = "force-dynamic";
@@ -13,8 +14,8 @@ export default async function VisitantesPage() {
   if (!user.churchId) return null;
 
   const [rows, relationOptions] = await Promise.all([
-    listRows("visitantes", user.churchId),
-    getRelationOptions("visitantes", user.churchId),
+    listRows("visitantes", scopeFromUser(user)),
+    getRelationOptions("visitantes", scopeFromUser(user)),
   ]);
 
   const canWrite =

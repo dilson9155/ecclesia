@@ -23,6 +23,7 @@ import {
   TrendingDown,
   TrendingUp,
   Truck,
+  UserCog,
   UserPlus,
   Users,
   Wallet,
@@ -36,7 +37,7 @@ export type NavItem = {
   key: string;
   label: string;
   href: string;
-  icon?: "dashboard" | "igrejas" | "membros" | "visitantes" | "carteirinhas" | "cartas" | "financeiro" | "contas" | "centrosCusto" | "dizimos" | "ofertas" | "fornecedores" | "entradas" | "saidas" | "livroCaixa" | "fechamento" | "relatorios" | "admin";
+  icon?: "dashboard" | "igrejas" | "usuarios" | "membros" | "visitantes" | "carteirinhas" | "cartas" | "financeiro" | "contas" | "centrosCusto" | "dizimos" | "ofertas" | "fornecedores" | "entradas" | "saidas" | "livroCaixa" | "fechamento" | "relatorios" | "admin";
 };
 
 export type NavGroup = {
@@ -47,6 +48,7 @@ export type NavGroup = {
 const NAV_ICONS: Record<NonNullable<NavItem["icon"]>, ReactNode> = {
   dashboard: <LayoutDashboard className="h-4 w-4" />,
   igrejas: <Building2 className="h-4 w-4" />,
+  usuarios: <UserCog className="h-4 w-4" />,
   membros: <Users className="h-4 w-4" />,
   visitantes: <UserPlus className="h-4 w-4" />,
   carteirinhas: <CreditCard className="h-4 w-4" />,

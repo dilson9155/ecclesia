@@ -5,6 +5,13 @@ import type { FieldDef } from "@/modules/registration/definitions";
 import { validateField } from "@/modules/registration/validators";
 import { auditLog } from "@/services/audit.service";
 import type { EntryNature, LedgerSource } from "@prisma/client";
+import {
+  scopedCongregationIds,
+  assertCongregationInScope,
+  type DataScope,
+} from "@/lib/scope";
+
+export type Actor = { userId: string; scope: DataScope };
 
 type ModelKey =
   | "church"
@@ -174,12 +181,64 @@ export function buildData(resourceKey: string, values: Record<string, unknown>) 
   return data;
 }
 
-function scopeFilter(resourceKey: string, churchId: string) {
-  if (resourceKey === "igrejas") return { id: churchId };
-  return { churchId };
+function scopeFilter(
+  resourceKey: string,
+  scope: DataScope
+): Promise<Record<string, unknown>> {
+  const churchWhere = scope.churchId ? { churchId: scope.churchId } : {};
+  if (scope.isSuperAdmin && !scope.sedeId) {
+    if (resourceKey === "igrejas") return Promise.resolve({ id: scope.churchId });
+    return Promise.resolve(churchWhere);
+  }
+  switch (resourceKey) {
+    case "igrejas":
+      return Promise.resolve({ id: scope.churchId });
+    case "sedes":
+      return Promise.resolve(scope.sedeId ? { id: scope.sedeId } : { id: "__none__" });
+    case "congregacoes":
+      if (scope.congregationId) {
+        return Promise.resolve({ id: scope.congregationId });
+      }
+      return Promise.resolve(scope.sedeId ? { sedeId: scope.sedeId } : { id: "__none__" });
+    case "membros":
+    case "visitantes":
+    case "dizimos":
+    case "ofertas":
+    case "entradas":
+    case "saidas":
+      return scopedCongregationIds(scope).then((congregationIds) => ({
+        ...churchWhere,
+        congregationId: {
+          in: congregationIds.length ? congregationIds : ["__none__"],
+        },
+      }));
+    default:
+      // contas, centrosCusto e fornecedores são referências no nível da igreja
+      return Promise.resolve(churchWhere);
+  }
 }
 
-export async function listRows(resourceKey: string, churchId: string): Promise<Row[]> {
+async function assertScopedRecord(
+  resourceKey: string,
+  scope: DataScope,
+  existing: Row
+): Promise<void> {
+  const scopedWhere = await scopeFilter(resourceKey, scope);
+  if (scopedWhere.id && existing.id !== scopedWhere.id) {
+    throw new Error("Registro não pertence à sua igreja.");
+  }
+  if (scopedWhere.churchId && existing.churchId !== scopedWhere.churchId) {
+    throw new Error("Registro não pertence à sua igreja.");
+  }
+  if (typeof existing.congregationId === "string") {
+    await assertCongregationInScope(scope, existing.congregationId);
+  }
+}
+
+export async function listRows(
+  resourceKey: string,
+  scope: DataScope
+): Promise<Row[]> {
   const model = MODEL_BY_RESOURCE[resourceKey];
   if (!model) return [];
   const def = getResource(resourceKey)!;
@@ -188,7 +247,7 @@ export async function listRows(resourceKey: string, churchId: string): Promise<R
     findMany: (args: { where?: Record<string, unknown>; orderBy?: Record<string, unknown> }) => Promise<Row[]>;
   };
   const rows = await delegate.findMany({
-    where: scopeFilter(resourceKey, churchId),
+    where: await scopeFilter(resourceKey, scope),
     orderBy: { [field]: direction },
   });
   return rows.map((row) => {
@@ -206,7 +265,7 @@ export async function listRows(resourceKey: string, churchId: string): Promise<R
 
 export async function getRelationOptions(
   resourceKey: string,
-  churchId: string
+  scope: DataScope
 ): Promise<Record<string, Option[]>> {
   const def = getResource(resourceKey);
   if (!def) return {};
@@ -221,7 +280,7 @@ export async function getRelationOptions(
       findMany: (args: { where?: Record<string, unknown>; orderBy?: Record<string, unknown> }) => Promise<Row[]>;
     };
     const targetRows = await delegate.findMany({
-      where: scopeFilter(targetKey, churchId),
+      where: await scopeFilter(targetKey, scope),
       orderBy: { [SORT_BY_MODEL[targetModel].field]: SORT_BY_MODEL[targetModel].direction },
     });
     out[field.key] = targetRows.map((r) => ({
@@ -234,7 +293,7 @@ export async function getRelationOptions(
 
 export async function saveRow(
   resourceKey: string,
-  actor: { userId: string; churchId: string },
+  actor: Actor,
   values: Record<string, unknown>,
   id: string | null
 ): Promise<Row> {
@@ -247,14 +306,22 @@ export async function saveRow(
     throw new Error("A entidade igreja é única e não pode ser criada aqui.");
   }
   if (resourceKey !== "igrejas") {
-    data.churchId = actor.churchId;
+    data.churchId = actor.scope.churchId;
+  }
+
+  if (resourceKey === "membros" || isLedgerResource(resourceKey)) {
+    const congregationId = String(data.congregationId ?? "");
+    if (!congregationId) throw new Error("Campo obrigatório: Congregação");
+    if (resourceKey !== "membros") {
+      await assertCongregationInScope(actor.scope, congregationId);
+    }
   }
 
   if (resourceKey === "membros") {
     const congregationId = String(data.congregationId ?? "");
-    if (!congregationId) throw new Error("Campo obrigatório: Congregação");
     const congregation = await prisma.congregation.findUnique({ where: { id: congregationId } });
     if (!congregation) throw new Error("Congregação não encontrada.");
+    await assertCongregationInScope(actor.scope, congregationId);
     if (!data.code) {
       const count = await prisma.member.count({ where: { congregationId } });
       data.code = String(count + 1).padStart(4, "0");
@@ -323,19 +390,13 @@ export async function saveRow(
     findUnique: (args: { where: { id: string } }) => Promise<Row | null>;
   };
 
-  const scopedWhere = scopeFilter(resourceKey, actor.churchId);
   const ledgerResource = isLedgerResource(resourceKey) ? resourceKey : null;
 
   let existing: Row | null = null;
   if (id) {
     const found = await delegate.findUnique({ where: { id } });
     if (!found) throw new Error("Registro não encontrado.");
-    if (scopedWhere.id && found.id !== scopedWhere.id) {
-      throw new Error("Registro não pertence à sua igreja.");
-    }
-    if (scopedWhere.churchId && found.churchId !== scopedWhere.churchId) {
-      throw new Error("Registro não pertence à sua igreja.");
-    }
+    await assertScopedRecord(resourceKey, actor.scope, found);
     existing = found;
   }
 
@@ -363,7 +424,7 @@ export async function saveRow(
     if (shouldPostLedger(resourceKey, existing, data)) {
       await cashEntry.create({
         data: {
-          churchId: actor.churchId,
+          churchId: actor.scope.churchId,
           congregationId: String(row.congregationId),
           ...ledgerFromRow(resourceKey as LedgerResource, actor, row),
         },
@@ -378,7 +439,7 @@ export async function saveRow(
       : await delegate.update({ where: { id }, data });
     await auditLog({
       userId: actor.userId,
-      churchId: actor.churchId,
+      churchId: actor.scope.churchId,
       action: "UPDATE",
       module: def.key,
       entity: def.singular,
@@ -394,7 +455,7 @@ export async function saveRow(
     : await delegate.create({ data });
   await auditLog({
     userId: actor.userId,
-    churchId: actor.churchId,
+    churchId: actor.scope.churchId,
     action: "CREATE",
     module: def.key,
     entity: def.singular,
@@ -407,7 +468,7 @@ export async function saveRow(
 
 export async function deleteRow(
   resourceKey: string,
-  actor: { userId: string; churchId: string },
+  actor: Actor,
   id: string
 ): Promise<void> {
   const model = MODEL_BY_RESOURCE[resourceKey];
@@ -418,15 +479,9 @@ export async function deleteRow(
     findUnique: (args: { where: { id: string } }) => Promise<Row | null>;
   };
 
-  const scopedWhere = scopeFilter(resourceKey, actor.churchId);
   const existing = await delegate.findUnique({ where: { id } });
   if (!existing) throw new Error("Registro não encontrado.");
-  if (scopedWhere.id && existing.id !== scopedWhere.id) {
-    throw new Error("Registro não pertence à sua igreja.");
-  }
-  if (scopedWhere.churchId && existing.churchId !== scopedWhere.churchId) {
-    throw new Error("Registro não pertence à sua igreja.");
-  }
+  await assertScopedRecord(resourceKey, actor.scope, existing);
 
   if (resourceKey === "saidas" && existing.status === "PAGO") {
     throw new Error("Saída paga não pode ser excluída. Cancele antes.");
@@ -457,7 +512,7 @@ export async function deleteRow(
 
   await auditLog({
     userId: actor.userId,
-    churchId: actor.churchId,
+    churchId: actor.scope.churchId,
     action: "DELETE",
     module: def.key,
     entity: def.singular,

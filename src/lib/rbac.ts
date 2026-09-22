@@ -14,6 +14,7 @@ export async function currentUser(): Promise<SessionUser | null> {
     roles: user.roles ?? [],
     permissions: user.permissions ?? [],
     churchId: user.churchId ?? null,
+    sedeId: user.sedeId ?? null,
     congregationId: user.congregationId ?? null,
   };
 }
