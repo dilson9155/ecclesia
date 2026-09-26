@@ -85,7 +85,7 @@ export function defaultRange(): { from: Date; to: Date } {
 
 export async function fetchCongregations(churchId: string) {
   return prisma.congregation.findMany({
-    where: { OR: [{ sedeId: churchId }, { churchId }] },
+    where: { churchId },
     orderBy: { name: "asc" },
     select: { id: true, name: true },
   });

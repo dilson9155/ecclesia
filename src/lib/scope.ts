@@ -37,12 +37,22 @@ export async function scopedCongregationIds(
   return [];
 }
 
-/** Verifica se a congregação informada pertence ao escopo do usuário. */
+/** Verifica se a congregação informada pertence à igreja e ao escopo do usuário. */
 export async function assertCongregationInScope(
   scope: DataScope,
   congregationId: string | null | undefined
 ): Promise<void> {
   if (!congregationId) return;
+  if (!scope.churchId) {
+    throw new Error("Nenhuma igreja vinculada ao seu usuário.");
+  }
+  const congregation = await prisma.congregation.findUnique({
+    where: { id: congregationId },
+    select: { id: true, churchId: true },
+  });
+  if (!congregation || congregation.churchId !== scope.churchId) {
+    throw new Error("Essa congregação não pertence à sua igreja.");
+  }
   if (scope.isSuperAdmin && !scope.sedeId) return;
   const allowed = await scopedCongregationIds(scope);
   if (!allowed.includes(congregationId)) {

@@ -65,6 +65,9 @@ export async function buildContext(
       })
     : null;
   if (memberId && !member) throw new Error("Membro não encontrado.");
+  if (member && member.churchId !== churchId) {
+    throw new Error("Membro não pertence à sua igreja.");
+  }
 
   const congregation = member?.congregation ?? null;
   const city = congregation?.city ?? "";
@@ -132,8 +135,21 @@ export async function createLetter(
   const member = input.memberId
     ? await prisma.member.findUnique({ where: { id: input.memberId } })
     : null;
+  if (input.memberId && (!member || member.churchId !== churchId)) {
+    throw new Error("Membro não pertence à sua igreja.");
+  }
+
   const congregationId =
     input.congregationId ?? member?.congregationId ?? null;
+  if (congregationId) {
+    const congregation = await prisma.congregation.findUnique({
+      where: { id: congregationId },
+      select: { id: true, churchId: true },
+    });
+    if (!congregation || congregation.churchId !== churchId) {
+      throw new Error("Congregação não pertence à sua igreja.");
+    }
+  }
 
   const count = await prisma.document.count({ where: { churchId } });
   const now = new Date();

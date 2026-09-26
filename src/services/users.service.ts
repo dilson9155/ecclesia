@@ -167,8 +167,10 @@ export async function listUsers(
   actor: UserActor
 ): Promise<UserListItem[]> {
   const churchId = actor.scope.churchId;
-  const where: { churchId?: string; sedeId?: string; congregationId?: string; id?: string } = {};
-  if (churchId) where.churchId = churchId;
+  if (!churchId) return [];
+  const where: { churchId: string; sedeId?: string; congregationId?: string } = {
+    churchId,
+  };
 
   if (actor.scope.isSuperAdmin && !actor.scope.sedeId) {
     // vê usuários de toda a igreja
@@ -177,7 +179,7 @@ export async function listUsers(
   } else if (actor.scope.sedeId) {
     where.sedeId = actor.scope.sedeId;
   } else {
-    where.id = "__none__";
+    where.sedeId = "__none__";
   }
 
   const rows = await prisma.user.findMany({
@@ -208,9 +210,12 @@ export async function listUsers(
 
 export async function loadManagerData(actor: UserActor): Promise<ManagerData> {
   const churchId = actor.scope.churchId;
+  if (!churchId) {
+    return { sedes: [], congregations: [], roles: [] };
+  }
 
   const sedes = await prisma.sede.findMany({
-    where: churchId ? { churchId } : undefined,
+    where: { churchId },
     select: { id: true, name: true },
     orderBy: { name: "asc" },
   });
@@ -227,12 +232,10 @@ export async function loadManagerData(actor: UserActor): Promise<ManagerData> {
     actor.scope.isSuperAdmin && !actor.scope.sedeId;
   const congregations = await prisma.congregation.findMany({
     where: superAdminAll
-      ? churchId
-        ? { churchId }
-        : undefined
+      ? { churchId }
       : congregationIds.length > 0
         ? { id: { in: congregationIds } }
-        : undefined,
+        : { id: "__none__" },
     select: { id: true, name: true, sedeId: true },
     orderBy: { name: "asc" },
   });

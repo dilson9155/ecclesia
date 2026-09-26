@@ -4,6 +4,20 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/rbac";
 import { revalidatePath } from "next/cache";
+import { assertCongregationInScope, scopeFromUser } from "@/lib/scope";
+
+async function assertCongregationOwned(
+  congregationId: string,
+  churchId: string
+): Promise<void> {
+  const congregation = await prisma.congregation.findUnique({
+    where: { id: congregationId },
+    select: { id: true, churchId: true },
+  });
+  if (!congregation || congregation.churchId !== churchId) {
+    throw new Error("Congregação não pertence à sua igreja.");
+  }
+}
 
 export async function closePeriod(
   congregationId: string,
@@ -14,6 +28,8 @@ export async function closePeriod(
   try {
     const user = await requirePermission("fechamento.fechar");
     if (!user.churchId) throw new Error("Igreja não vinculada.");
+    await assertCongregationOwned(congregationId, user.churchId);
+    await assertCongregationInScope(scopeFromUser(user), congregationId);
 
     const start = new Date(year, month - 1, 1);
     const end = new Date(year, month, 1);
@@ -93,6 +109,8 @@ export async function reopenPeriod(
   try {
     const user = await requirePermission("fechamento.reabrir");
     if (!user.churchId) throw new Error("Igreja não vinculada.");
+    await assertCongregationOwned(congregationId, user.churchId);
+    await assertCongregationInScope(scopeFromUser(user), congregationId);
 
     const existing = await prisma.financialClosing.findUnique({
       where: { congregationId_year_month: { congregationId, year, month } },

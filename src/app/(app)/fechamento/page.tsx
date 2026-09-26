@@ -19,9 +19,7 @@ export default async function FechamentoPage({ searchParams }: Props) {
   const month = Number(sp.month) || now.getMonth() + 1;
 
   const congregations = await prisma.congregation.findMany({
-    where: {
-      OR: [{ sedeId: user.churchId }, { churchId: user.churchId }],
-    },
+    where: { churchId: user.churchId },
     orderBy: { name: "asc" },
   });
 

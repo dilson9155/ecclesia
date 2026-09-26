@@ -185,7 +185,12 @@ function scopeFilter(
   resourceKey: string,
   scope: DataScope
 ): Promise<Record<string, unknown>> {
-  const churchWhere = scope.churchId ? { churchId: scope.churchId } : {};
+  const churchWhere = scope.churchId
+    ? { churchId: scope.churchId }
+    : { id: "__none__" };
+  if (!scope.churchId) {
+    return Promise.resolve({ id: "__none__" });
+  }
   if (scope.isSuperAdmin && !scope.sedeId) {
     if (resourceKey === "igrejas") return Promise.resolve({ id: scope.churchId });
     return Promise.resolve(churchWhere);

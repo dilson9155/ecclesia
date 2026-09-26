@@ -24,6 +24,9 @@ export async function requireAuth(): Promise<SessionUser> {
   if (!user) {
     redirect("/login");
   }
+  if (!user.churchId) {
+    redirect("/forbidden");
+  }
   return user;
 }
 
