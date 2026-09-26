@@ -1,6 +1,7 @@
 import * as PDF from "@react-pdf/renderer";
 import * as XLSX from "xlsx";
 import { requirePermission } from "@/lib/rbac";
+import { scopeFromUser, scopedCongregationIdsOrNull } from "@/lib/scope";
 import { auditLog } from "@/services/audit.service";
 import {
   getMemberReport,
@@ -26,12 +27,23 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const fmt = searchParams.get("fmt") ?? "pdf";
-  const congregationId = searchParams.get("congregationId") ?? undefined;
+  const requestedCongregationId = searchParams.get("congregationId") ?? undefined;
   const situation = searchParams.get("situation") ?? undefined;
+
+  const scope = scopeFromUser(user);
+  const allowedIds = await scopedCongregationIdsOrNull(scope);
+  const congregationId =
+    allowedIds === null || !requestedCongregationId || allowedIds.includes(requestedCongregationId)
+      ? requestedCongregationId
+      : undefined;
 
   const [context, report] = await Promise.all([
     getReportContext(user.churchId),
-    getMemberReport(user.churchId, { congregationId, situation }),
+    getMemberReport(user.churchId, {
+      congregationId,
+      congregationIds: allowedIds,
+      situation,
+    }),
   ]);
 
   await auditLog({

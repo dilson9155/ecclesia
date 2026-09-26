@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/rbac";
+import { scopeFromUser, congregationWhere } from "@/lib/scope";
 
 export async function GET(request: Request) {
   const user = await requirePermission("livroCaixa.export");
@@ -24,7 +25,7 @@ export async function GET(request: Request) {
 
   const entries = await prisma.cashEntry.findMany({
     where: {
-      churchId: user.churchId,
+      ...(await congregationWhere(scopeFromUser(user))),
       date: { gte: start, lt: end },
     },
     orderBy: [{ date: "asc" }, { createdAt: "asc" }],

@@ -1,6 +1,7 @@
 import { Download, FileSpreadsheet, FileText } from "lucide-react";
 import Link from "next/link";
 import { requirePermission, can } from "@/lib/rbac";
+import { scopeFromUser, scopedCongregationIdsOrNull } from "@/lib/scope";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,15 +26,23 @@ export default async function RelatorioContribuicoesPage({ searchParams }: Props
   const sp = await searchParams;
   const from = sp.from ?? "";
   const to = sp.to ?? "";
-  const congregationId = sp.congregationId ?? "";
+  const requestedCongregationId = sp.congregationId ?? "";
   const type = sp.type ?? "ambos";
 
+  const scope = scopeFromUser(user);
+  const allowedIds = await scopedCongregationIdsOrNull(scope);
+  const congregationId =
+    allowedIds === null || allowedIds.includes(requestedCongregationId)
+      ? requestedCongregationId
+      : "";
+
   const [congregations, report] = await Promise.all([
-    fetchCongregations(user.churchId),
+    fetchCongregations(scope),
     getContributionsReport(user.churchId, {
       from: from ? new Date(`${from}T00:00:00`) : undefined,
       to: to ? new Date(`${to}T23:59:59`) : undefined,
       congregationId: congregationId || undefined,
+      congregationIds: allowedIds,
       type,
     }),
   ]);

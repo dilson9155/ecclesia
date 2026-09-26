@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { requirePermission, can } from "@/lib/rbac";
+import { scopeFromUser, congregationWhere } from "@/lib/scope";
 import { LivroCaixaClient } from "@/components/livro-caixa-client";
 
 export const dynamic = "force-dynamic";
@@ -10,7 +11,7 @@ export default async function LivroCaixaPage() {
   const canExport = await can(user, "livroCaixa.export");
 
   const entries = await prisma.cashEntry.findMany({
-    where: { churchId: user.churchId },
+    where: (await congregationWhere(scopeFromUser(user))) as never,
     orderBy: [{ date: "asc" }, { createdAt: "asc" }],
     include: {
       account: { select: { name: true } },

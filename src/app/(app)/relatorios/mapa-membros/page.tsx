@@ -1,6 +1,7 @@
 import { Download, FileSpreadsheet, FileText } from "lucide-react";
 import Link from "next/link";
 import { requirePermission, can } from "@/lib/rbac";
+import { scopeFromUser, scopedCongregationIdsOrNull } from "@/lib/scope";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DistributionPie } from "@/components/reports/charts";
@@ -25,13 +26,21 @@ export default async function MapaMembrosPage({ searchParams }: Props) {
   const canExport = await can(user, "relatorios.export");
 
   const sp = await searchParams;
-  const congregationId = sp.congregationId ?? "";
+  const requestedCongregationId = sp.congregationId ?? "";
   const situation = sp.situation ?? "";
 
+  const scope = scopeFromUser(user);
+  const allowedIds = await scopedCongregationIdsOrNull(scope);
+  const congregationId =
+    allowedIds === null || allowedIds.includes(requestedCongregationId)
+      ? requestedCongregationId
+      : "";
+
   const [congregations, report] = await Promise.all([
-    fetchCongregations(user.churchId),
+    fetchCongregations(scope),
     getMemberReport(user.churchId, {
       congregationId: congregationId || undefined,
+      congregationIds: allowedIds,
       situation: situation || undefined,
     }),
   ]);

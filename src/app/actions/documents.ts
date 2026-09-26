@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/rbac";
+import { scopeFromUser } from "@/lib/scope";
 import { createLetter, deleteLetter } from "@/services/documents.service";
 import type { DocumentType } from "@prisma/client";
 
@@ -30,7 +31,7 @@ export async function newLetter(input: NewLetterInput) {
       title: input.title,
       content: input.content,
       signatureName: input.signatureName,
-    });
+    }, scopeFromUser(user));
   } catch (error) {
     return { ok: false, error: (error as Error).message };
   }

@@ -2,6 +2,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
 import { auditLog } from "@/services/audit.service";
+import { assertCongregationInScope, type DataScope } from "@/lib/scope";
 
 function issueDate() {
   const d = new Date();
@@ -9,9 +10,16 @@ function issueDate() {
   return d;
 }
 
-export async function listCards(churchId: string) {
+function congregationIn(ids: string[] | null | undefined) {
+  return ids ? { congregationId: { in: ids.length ? ids : ["__none__"] } } : {};
+}
+
+export async function listCards(
+  churchId: string,
+  congregationIds?: string[] | null
+) {
   return prisma.membershipCard.findMany({
-    where: { churchId },
+    where: { churchId, ...congregationIn(congregationIds) },
     orderBy: { createdAt: "desc" },
     include: {
       member: { select: { id: true, name: true, code: true } },
@@ -35,9 +43,12 @@ export async function getCard(churchId: string, cardId: string) {
   });
 }
 
-export async function getMemberOptionList(churchId: string) {
+export async function getMemberOptionList(
+  churchId: string,
+  congregationIds?: string[] | null
+) {
   return prisma.member.findMany({
-    where: { churchId },
+    where: { churchId, ...congregationIn(congregationIds) },
     orderBy: { name: "asc" },
     select: {
       id: true,
@@ -51,7 +62,8 @@ export async function getMemberOptionList(churchId: string) {
 export async function issueCard(
   churchId: string,
   userId: string,
-  memberId: string
+  memberId: string,
+  scope?: DataScope
 ) {
   const member = await prisma.member.findUnique({
     where: { id: memberId },
@@ -60,6 +72,9 @@ export async function issueCard(
   if (!member) throw new Error("Membro não encontrado.");
   if (member.churchId !== churchId) {
     throw new Error("Registro não pertence à sua igreja.");
+  }
+  if (scope) {
+    await assertCongregationInScope(scope, member.congregationId);
   }
 
   const count = await prisma.membershipCard.count({ where: { churchId } });

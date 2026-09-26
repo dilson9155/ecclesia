@@ -37,6 +37,48 @@ export async function scopedCongregationIds(
   return [];
 }
 
+/** null = todas as congregações da igreja; senão, ids acessíveis apenas. */
+export async function scopedCongregationIdsOrNull(
+  scope: DataScope
+): Promise<string[] | null> {
+  if (!scope.churchId) return [];
+  if (scope.isSuperAdmin && !scope.sedeId) return null;
+  return scopedCongregationIds(scope);
+}
+
+/** Congregações acessíveis (registros completos) do escopo. */
+export async function accessibleCongregations(
+  scope: DataScope
+): Promise<Array<{ id: string; name: string; sedeId: string | null }>> {
+  const ids = await scopedCongregationIdsOrNull(scope);
+  if (!scope.churchId) return [];
+  if (ids === null) {
+    return prisma.congregation.findMany({
+      where: { churchId: scope.churchId },
+      select: { id: true, name: true, sedeId: true },
+      orderBy: { name: "asc" },
+    });
+  }
+  return prisma.congregation.findMany({
+    where: { id: { in: ids.length ? ids : ["__none__"] } },
+    select: { id: true, name: true, sedeId: true },
+    orderBy: { name: "asc" },
+  });
+}
+
+/** Filtro Prisma para modelos com churchId + congregationId, conforme o escopo. */
+export async function congregationWhere(
+  scope: DataScope
+): Promise<Record<string, unknown>> {
+  if (!scope.churchId) return { id: "__none__" };
+  const ids = await scopedCongregationIdsOrNull(scope);
+  if (ids === null) return { churchId: scope.churchId };
+  return {
+    churchId: scope.churchId,
+    congregationId: { in: ids.length ? ids : ["__none__"] },
+  };
+}
+
 /** Verifica se a congregação informada pertence à igreja e ao escopo do usuário. */
 export async function assertCongregationInScope(
   scope: DataScope,

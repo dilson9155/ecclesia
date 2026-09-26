@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { formatMoney } from "@/lib/format";
+import { accessibleCongregations, type DataScope } from "@/lib/scope";
 
 export type MemberReportRow = {
   code: string;
@@ -83,22 +84,39 @@ export function defaultRange(): { from: Date; to: Date } {
   return { from, to: now };
 }
 
-export async function fetchCongregations(churchId: string) {
-  return prisma.congregation.findMany({
-    where: { churchId },
-    orderBy: { name: "asc" },
-    select: { id: true, name: true },
-  });
+export async function fetchCongregations(scope: DataScope) {
+  const rows = await accessibleCongregations(scope);
+  return rows.map((c) => ({ id: c.id, name: c.name }));
+}
+
+/** Restringe a consulta às congregações permitidas (null = igreja toda). */
+async function restrictCongregation(
+  where: Record<string, unknown>,
+  congregationId: string | undefined,
+  congregationIds: string[] | null | undefined
+): Promise<Record<string, unknown>> {
+  if (congregationIds) {
+    where.congregationId = {
+      in: congregationIds.length ? congregationIds : ["__none__"],
+    };
+    return where;
+  }
+  if (congregationId) where.congregationId = congregationId;
+  return where;
 }
 
 /** Relatório de membros (mapa) */
 export async function getMemberReport(
   churchId: string,
-  opts: { congregationId?: string; situation?: string } = {}
+  opts: {
+    congregationId?: string;
+    situation?: string;
+    congregationIds?: string[] | null;
+  } = {}
 ) {
   const where: Record<string, unknown> = { churchId };
-  if (opts.congregationId) where.congregationId = opts.congregationId;
   if (opts.situation) where.situation = opts.situation;
+  await restrictCongregation(where, opts.congregationId, opts.congregationIds);
 
   const members = await prisma.member.findMany({
     where,
@@ -137,7 +155,12 @@ export async function getMemberReport(
 /** Relatório financeiro (fluxo de caixa por conta) */
 export async function getFinancialReport(
   churchId: string,
-  opts: { from?: Date; to?: Date; congregationId?: string } = {}
+  opts: {
+    from?: Date;
+    to?: Date;
+    congregationId?: string;
+    congregationIds?: string[] | null;
+  } = {}
 ) {
   const { from, to } = defaultRange();
   const gte = opts.from ?? from;
@@ -147,7 +170,7 @@ export async function getFinancialReport(
     churchId,
     date: { gte, lte },
   };
-  if (opts.congregationId) where.congregationId = opts.congregationId;
+  await restrictCongregation(where, opts.congregationId, opts.congregationIds);
 
   const entries = await prisma.cashEntry.findMany({
     where,
@@ -214,7 +237,13 @@ function contributorLabel(memberName?: string | null, contributor?: string | nul
 /** Relatório de contribuições (dízimos + ofertas) */
 export async function getContributionsReport(
   churchId: string,
-  opts: { from?: Date; to?: Date; congregationId?: string; type?: string } = {}
+  opts: {
+    from?: Date;
+    to?: Date;
+    congregationId?: string;
+    congregationIds?: string[] | null;
+    type?: string;
+  } = {}
 ) {
   const { from, to } = defaultRange();
   const gte = opts.from ?? from;
@@ -223,10 +252,8 @@ export async function getContributionsReport(
 
   const whereTithe: Record<string, unknown> = { churchId, date: { gte, lte } };
   const whereOffering: Record<string, unknown> = { churchId, date: { gte, lte } };
-  if (opts.congregationId) {
-    whereTithe.congregationId = opts.congregationId;
-    whereOffering.congregationId = opts.congregationId;
-  }
+  await restrictCongregation(whereTithe, opts.congregationId, opts.congregationIds);
+  await restrictCongregation(whereOffering, opts.congregationId, opts.congregationIds);
 
   const tithes = type === "ofertas"
     ? []

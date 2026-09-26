@@ -1,4 +1,5 @@
 import { requirePermission, can } from "@/lib/rbac";
+import { scopeFromUser, scopedCongregationIdsOrNull } from "@/lib/scope";
 import {
   listLetters,
   getTemplates,
@@ -12,10 +13,11 @@ export default async function CartasPage() {
   const user = await requirePermission("cartas.view");
   if (!user.churchId) return null;
 
+  const congregationIds = await scopedCongregationIdsOrNull(scopeFromUser(user));
   const [letters, templates, members] = await Promise.all([
-    listLetters(user.churchId),
+    listLetters(user.churchId, congregationIds),
     getTemplates(user.churchId),
-    getMemberOptions(user.churchId),
+    getMemberOptions(user.churchId, congregationIds),
   ]);
 
   return (

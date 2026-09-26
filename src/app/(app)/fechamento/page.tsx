@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { requirePermission, can } from "@/lib/rbac";
+import { scopeFromUser, scopedCongregationIdsOrNull } from "@/lib/scope";
 import { FechamentoManager } from "@/components/fechamento-manager";
 
 export const dynamic = "force-dynamic";
@@ -18,13 +19,25 @@ export default async function FechamentoPage({ searchParams }: Props) {
   const year = Number(sp.year) || now.getFullYear();
   const month = Number(sp.month) || now.getMonth() + 1;
 
+  const allowedIds = await scopedCongregationIdsOrNull(scopeFromUser(user));
   const congregations = await prisma.congregation.findMany({
-    where: { churchId: user.churchId },
+    where:
+      allowedIds === null
+        ? { churchId: user.churchId }
+        : { id: { in: allowedIds.length ? allowedIds : ["__none__"] } },
     orderBy: { name: "asc" },
   });
 
   const closings = await prisma.financialClosing.findMany({
-    where: { churchId: user.churchId, year, month },
+    where:
+      allowedIds === null
+        ? { churchId: user.churchId, year, month }
+        : {
+            churchId: user.churchId,
+            year,
+            month,
+            congregationId: { in: allowedIds.length ? allowedIds : ["__none__"] },
+          },
   });
   const closingMap = new Map(closings.map((c) => [c.congregationId, c]));
 

@@ -1,5 +1,6 @@
 import * as PDF from "@react-pdf/renderer";
 import { requirePermission } from "@/lib/rbac";
+import { scopeFromUser, scopedCongregationIdsOrNull } from "@/lib/scope";
 import { getLetter } from "@/services/documents.service";
 
 const styles: PDF.Styles = {
@@ -61,7 +62,11 @@ const styles: PDF.Styles = {
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const user = await requirePermission("cartas.view");
   const { id } = await ctx.params;
-  const document = await getLetter(user.churchId ?? "", id);
+  const document = await getLetter(
+    user.churchId ?? "",
+    id,
+    await scopedCongregationIdsOrNull(scopeFromUser(user))
+  );
   if (!document) {
     return new Response("Documento não encontrado.", { status: 404 });
   }

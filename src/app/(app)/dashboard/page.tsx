@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { requireAuth } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
+import { scopeFromUser, scopedCongregationIdsOrNull, congregationWhere } from "@/lib/scope";
 import {
   Card,
   CardContent,
@@ -33,6 +34,13 @@ export default async function DashboardPage() {
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
   const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
 
+  const scope = scopeFromUser(user);
+  const allowedIds = await scopedCongregationIdsOrNull(scope);
+  const dataWhere = await congregationWhere(scope);
+  const congregationWhereCount = allowedIds === null
+    ? { churchId: user.churchId }
+    : { id: { in: allowedIds.length ? allowedIds : ["__none__"] } };
+
   const [
     congregations,
     members,
@@ -45,34 +53,34 @@ export default async function DashboardPage() {
     cashflowEntries,
   ] = user.churchId
     ? await Promise.all([
-        prisma.congregation.count({ where: { churchId: user.churchId } }),
-        prisma.member.count({ where: { churchId: user.churchId } }),
+        prisma.congregation.count({ where: congregationWhereCount as never }),
+        prisma.member.count({ where: dataWhere as never }),
         prisma.expense.count({
-          where: { churchId: user.churchId, status: "PENDENTE" },
+          where: { ...dataWhere, status: "PENDENTE" } as never,
         }),
         prisma.tithe.aggregate({
-          where: { churchId: user.churchId, date: { gte: monthStart, lt: monthEnd } },
+          where: { ...dataWhere, date: { gte: monthStart, lt: monthEnd } } as never,
           _sum: { value: true },
         }),
         prisma.offering.aggregate({
-          where: { churchId: user.churchId, date: { gte: monthStart, lt: monthEnd } },
+          where: { ...dataWhere, date: { gte: monthStart, lt: monthEnd } } as never,
           _sum: { value: true },
         }),
         prisma.cashEntry.aggregate({
-          where: { churchId: user.churchId, date: { gte: monthStart, lt: monthEnd }, nature: "ENTRADA" },
+          where: { ...dataWhere, date: { gte: monthStart, lt: monthEnd }, nature: "ENTRADA" } as never,
           _sum: { value: true },
         }),
         prisma.cashEntry.aggregate({
-          where: { churchId: user.churchId, date: { gte: monthStart, lt: monthEnd }, nature: "SAIDA" },
+          where: { ...dataWhere, date: { gte: monthStart, lt: monthEnd }, nature: "SAIDA" } as never,
           _sum: { value: true },
         }),
         prisma.member.groupBy({
           by: ["situation"],
-          where: { churchId: user.churchId },
+          where: dataWhere as never,
           _count: { _all: true },
         }),
         prisma.cashEntry.findMany({
-          where: { churchId: user.churchId, date: { gte: sixMonthsAgo } },
+          where: { ...dataWhere, date: { gte: sixMonthsAgo } } as never,
           select: { date: true, nature: true, value: true },
         }),
       ])

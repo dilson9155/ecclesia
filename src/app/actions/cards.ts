@@ -2,13 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/rbac";
+import { scopeFromUser } from "@/lib/scope";
 import { issueCard, cancelCard } from "@/services/cards.service";
 
 export async function emitCard(memberId: string) {
   const user = await requirePermission("carteirinhas.emit");
   if (!user.churchId) return { ok: false, error: "Nenhuma igreja vinculada ao seu usuário." };
   try {
-    await issueCard(user.churchId, user.id, memberId);
+    await issueCard(user.churchId, user.id, memberId, scopeFromUser(user));
   } catch (error) {
     return { ok: false, error: (error as Error).message };
   }

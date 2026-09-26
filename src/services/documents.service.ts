@@ -2,10 +2,18 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { auditLog } from "@/services/audit.service";
 import type { DocumentType } from "@prisma/client";
+import { assertCongregationInScope, type DataScope } from "@/lib/scope";
 
-export async function listLetters(churchId: string) {
+function congregationIn(ids: string[] | null | undefined) {
+  return ids ? { congregationId: { in: ids.length ? ids : ["__none__"] } } : {};
+}
+
+export async function listLetters(
+  churchId: string,
+  congregationIds?: string[] | null
+) {
   return prisma.document.findMany({
-    where: { churchId },
+    where: { churchId, ...congregationIn(congregationIds) },
     orderBy: { createdAt: "desc" },
     include: {
       member: { select: { id: true, name: true, code: true } },
@@ -15,9 +23,13 @@ export async function listLetters(churchId: string) {
   });
 }
 
-export async function getLetter(churchId: string, documentId: string) {
+export async function getLetter(
+  churchId: string,
+  documentId: string,
+  congregationIds?: string[] | null
+) {
   return prisma.document.findFirst({
-    where: { id: documentId, churchId },
+    where: { id: documentId, churchId, ...congregationIn(congregationIds) },
     include: {
       member: true,
       congregation: true,
@@ -33,9 +45,12 @@ export async function getTemplates(churchId: string) {
   });
 }
 
-export async function getMemberOptions(churchId: string) {
+export async function getMemberOptions(
+  churchId: string,
+  congregationIds?: string[] | null
+) {
   return prisma.member.findMany({
-    where: { churchId, situation: "ATIVO" },
+    where: { churchId, situation: "ATIVO", ...congregationIn(congregationIds) },
     orderBy: { name: "asc" },
     select: {
       id: true,
@@ -110,7 +125,8 @@ type CreateLetterInput = {
 export async function createLetter(
   churchId: string,
   userId: string,
-  input: CreateLetterInput
+  input: CreateLetterInput,
+  scope?: DataScope
 ) {
   const template = input.templateId
     ? await prisma.letterTemplate.findFirst({
@@ -149,6 +165,9 @@ export async function createLetter(
     if (!congregation || congregation.churchId !== churchId) {
       throw new Error("Congregação não pertence à sua igreja.");
     }
+  }
+  if (scope) {
+    await assertCongregationInScope(scope, congregationId);
   }
 
   const count = await prisma.document.count({ where: { churchId } });
