@@ -1,11 +1,12 @@
 import { PrismaClient, DocumentType, UserRoleName } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { DEFAULT_PLANS, planFeatures } from "../src/modules/platform/pricing";
 
 const prisma = new PrismaClient();
 
 const ROLES: Array<{ name: UserRoleName; description: string }> = [
   { name: "SUPER_ADMIN", description: "Super administrador: acesso total ao sistema" },
-  { name: "ADMIN_SEDE", description: "Administrador da sede: gerencia toda a igreja" },
+  { name: "ADMIN_SEDE", description: "Administrador da sede: gerencia as congregações da própria sede" },
   { name: "ADMIN_CONGREGACAO", description: "Administrador de uma congregação" },
   { name: "FINANCEIRO", description: "Responsável pelo financeiro e contabilidade" },
   { name: "SECRETARIA", description: "Secretaria: membros, carteirinhas e cartas" },
@@ -414,6 +415,124 @@ async function seedTemplates(churchId: string) {
   }
 }
 
+async function seedPlans() {
+  for (const plan of DEFAULT_PLANS) {
+    await prisma.plan.upsert({
+      where: { code: plan.code },
+      // Não sobrescreve preços ajustados pelo Super Admin.
+      update: {},
+      create: {
+        code: plan.code,
+        name: plan.name,
+        description: plan.description,
+        structureType: plan.structureType,
+        minMembers: plan.minMembers,
+        maxMembers: plan.maxMembers,
+        price: plan.price.toFixed(2),
+        maxSedes: plan.maxSedes,
+        maxCongregations: plan.maxCongregations,
+        features: planFeatures(plan.structureType),
+      },
+    });
+  }
+}
+
+async function seedChurchSubscription(churchId: string) {
+  const [memberCount, congregationCount, existing] = await Promise.all([
+    prisma.member.count({ where: { churchId } }),
+    prisma.congregation.count({ where: { churchId } }),
+    prisma.subscription.findUnique({ where: { churchId } }),
+  ]);
+
+  const structureType =
+    congregationCount > 0 ? "SEDE_AND_CONGREGATIONS" : "SEDE_ONLY";
+
+  if (!existing) {
+    const plan = await prisma.plan.findFirst({
+      where: {
+        active: true,
+        structureType,
+        minMembers: { lte: memberCount },
+        OR: [{ maxMembers: null }, { maxMembers: { gte: memberCount } }],
+      },
+      orderBy: { minMembers: "desc" },
+      select: { id: true },
+    });
+
+    await prisma.church.update({
+      where: { id: churchId },
+      data: {
+        structureType,
+        congregationMemberCount: memberCount,
+        memberCount,
+      },
+    });
+
+    if (plan) {
+      await prisma.subscription.create({
+        data: {
+          churchId,
+          planId: plan.id,
+          status: "ACTIVE",
+          startedAt: new Date(),
+          currentPeriodStart: new Date(),
+          currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        },
+      });
+    }
+    return;
+  }
+
+  if (memberCount > 0) {
+    await prisma.church.update({
+      where: { id: churchId },
+      data: {
+        structureType,
+        congregationMemberCount: memberCount,
+        memberCount,
+      },
+    });
+  }
+}
+
+async function seedPlatformAdmin() {
+  const email = (
+    process.env.SEED_PLATFORM_ADMIN_EMAIL ?? "plataforma@ecclesia.com.br"
+  )
+    .trim()
+    .toLowerCase();
+  const password =
+    process.env.SEED_PLATFORM_ADMIN_PASSWORD ??
+    (process.env.NODE_ENV === "production" ? null : "Plataforma@123");
+
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing) {
+    await prisma.user.update({
+      where: { id: existing.id },
+      data: { isPlatformAdmin: true, active: true },
+    });
+    return;
+  }
+
+  if (!password) {
+    console.warn(
+      "SEED_PLATFORM_ADMIN_PASSWORD não definido; o Super Admin da plataforma não foi criado."
+    );
+    return;
+  }
+
+  const passwordHash = await bcrypt.hash(password, 12);
+  await prisma.user.create({
+    data: {
+      name: "Administrador da Plataforma",
+      email,
+      passwordHash,
+      isPlatformAdmin: true,
+      active: true,
+    },
+  });
+}
+
 async function seedAdmin(churchId: string) {
   const email = process.env.SEED_ADMIN_EMAIL;
   const password = process.env.SEED_ADMIN_PASSWORD;
@@ -439,12 +558,15 @@ async function seedAdmin(churchId: string) {
 
 async function main() {
   await seedAuth();
+  await seedPlans();
+  await seedPlatformAdmin();
 
   const { church, sede, congregacao } = await seedChurch();
   await seedAccounts(church.id);
   await seedCostCenters(church.id);
   await seedTemplates(church.id);
   await seedAdmin(church.id);
+  await seedChurchSubscription(church.id);
 
   const counts = {
     roles: await prisma.role.count(),

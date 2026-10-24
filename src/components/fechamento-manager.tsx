@@ -65,8 +65,94 @@ export function FechamentoManager({
           {error}
         </p>
       )}
-      <div className="overflow-x-auto rounded-md border">
-        <table className="w-full text-sm">
+      <div className="space-y-2 md:hidden">
+        {rows.length === 0 ? (
+          <div className="rounded-lg border bg-card px-3 py-8 text-center text-sm text-muted-foreground">
+            Nenhuma congregação encontrada.
+          </div>
+        ) : (
+          rows.map((r) => (
+            <div key={r.congregationId} className="rounded-lg border bg-card p-3 shadow-sm">
+              <div className="flex items-start justify-between gap-2">
+                <p className="min-w-0 truncate text-sm font-semibold">
+                  {r.congregationName}
+                </p>
+                <span
+                  className={`shrink-0 text-xs font-medium ${
+                    r.status === "FECHADO"
+                      ? "text-emerald-600"
+                      : "text-muted-foreground"
+                  }`}
+                >
+                  {r.status}
+                </span>
+              </div>
+              <dl className="mt-2 grid grid-cols-1 gap-1 text-xs min-[420px]:grid-cols-3">
+                <div>
+                  <dt className="text-muted-foreground">Receita</dt>
+                  <dd className="font-medium">
+                    {r.revenue != null ? formatMoney(r.revenue, true) : "—"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Despesa</dt>
+                  <dd className="font-medium">
+                    {r.expense != null ? formatMoney(r.expense, true) : "—"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Saldo</dt>
+                  <dd className="font-medium">
+                    {r.balance != null ? formatMoney(r.balance, true) : "—"}
+                  </dd>
+                </div>
+              </dl>
+              {r.observations && (
+                <p className="mt-2 rounded bg-muted/40 px-2 py-1.5 text-xs text-muted-foreground">
+                  {r.observations}
+                </p>
+              )}
+              {r.status === "ABERTO" && canClose && (
+                <div className="mt-3 space-y-2 border-t pt-2">
+                  <input
+                    className="w-full rounded-md border px-2 py-1.5 text-sm"
+                    placeholder="Observação (opcional)"
+                    value={obs[r.congregationId] ?? ""}
+                    onChange={(e) =>
+                      setObs((o) => ({
+                        ...o,
+                        [r.congregationId]: e.target.value,
+                      }))
+                    }
+                  />
+                  <Button
+                    size="sm"
+                    className="w-full"
+                    disabled={busy === r.congregationId}
+                    onClick={() => handleClose(r.congregationId)}
+                  >
+                    {busy === r.congregationId ? "Fechando..." : "Fechar período"}
+                  </Button>
+                </div>
+              )}
+              {r.status === "FECHADO" && canReopen && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="mt-3 w-full"
+                  disabled={busy === r.congregationId}
+                  onClick={() => handleReopen(r.congregationId)}
+                >
+                  {busy === r.congregationId ? "Reabrindo..." : "Reabrir período"}
+                </Button>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+
+      <div className="hidden overflow-x-auto rounded-md border md:block">
+        <table className="w-full min-w-[760px] text-sm">
           <thead className="bg-muted/50 text-left text-xs uppercase text-muted-foreground">
             <tr>
               <th className="p-2">Congregação</th>

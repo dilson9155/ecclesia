@@ -25,6 +25,15 @@ export default async function EstruturaLayout({ children }: { children: ReactNod
       </div>
 
       <nav className="flex flex-wrap gap-2">
+        <Link
+          href="/estrutura"
+          className={cn(
+            "rounded-full border border-input bg-background px-4 py-1.5 text-sm font-medium",
+            "text-muted-foreground shadow-sm transition-colors hover:text-foreground"
+          )}
+        >
+          Visão geral
+        </Link>
         {visibleResources.map((r) => (
           <Link
             key={r.key}

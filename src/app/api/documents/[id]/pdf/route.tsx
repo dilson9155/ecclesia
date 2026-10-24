@@ -2,10 +2,11 @@ import * as PDF from "@react-pdf/renderer";
 import { requirePermission } from "@/lib/rbac";
 import { scopeFromUser, scopedCongregationIdsOrNull } from "@/lib/scope";
 import { getLetter } from "@/services/documents.service";
+import { getChurchBranding } from "@/services/branding.service";
 
 const styles: PDF.Styles = {
   page: {
-    paddingTop: 56,
+    paddingTop: 48,
     paddingBottom: 56,
     paddingHorizontal: 56,
     fontSize: 11,
@@ -17,9 +18,14 @@ const styles: PDF.Styles = {
     borderBottomWidth: 2,
     borderBottomColor: "#0f172a",
     borderBottomStyle: "solid",
-    paddingBottom: 10,
+    paddingBottom: 12,
     marginBottom: 22,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
   },
+  logo: { width: 54, height: 54, objectFit: "contain" },
+  headerText: { flexGrow: 1 },
   church: { fontSize: 16, fontFamily: "Helvetica-Bold", color: "#0f172a" },
   meta: { fontSize: 9, color: "#64748b", marginTop: 4 },
   title: {
@@ -33,19 +39,29 @@ const styles: PDF.Styles = {
   body: { marginBottom: 26 },
   paragraph: { marginBottom: 8 },
   blank: { marginBottom: 12 },
-  signRow: { marginTop: 40, alignItems: "center" },
+  date: { marginTop: 26, marginBottom: 16, fontSize: 10, color: "#475569", textAlign: "center" },
+  signRow: {
+    marginTop: 8,
+    flexDirection: "row",
+    justifyContent: "space-around",
+    gap: 24,
+  },
+  signBlock: { alignItems: "center", width: 190 },
+  signImage: { height: 44, maxWidth: 170, objectFit: "contain", marginBottom: 3 },
   signLine: {
     borderTopWidth: 1,
     borderTopColor: "#64748b",
     borderTopStyle: "solid",
-    paddingTop: 6,
-    width: 320,
+    paddingTop: 5,
+    width: 190,
     textAlign: "center",
     color: "#475569",
+    fontSize: 9,
   },
+  signRole: { fontSize: 7.5, color: "#94a3b8", textAlign: "center", marginTop: 2 },
   footer: {
     position: "absolute",
-    bottom: 40,
+    bottom: 36,
     left: 56,
     right: 56,
     borderTopWidth: 1,
@@ -59,14 +75,35 @@ const styles: PDF.Styles = {
   },
 };
 
+function SignatureBlock({
+  name,
+  role,
+  imageUrl,
+}: {
+  name: string;
+  role: string;
+  imageUrl: string | null;
+}) {
+  return (
+    <PDF.View style={styles.signBlock}>
+      {imageUrl ? <PDF.Image src={imageUrl} style={styles.signImage} /> : null}
+      <PDF.Text style={styles.signLine}>{name || "________________________"}</PDF.Text>
+      <PDF.Text style={styles.signRole}>{role}</PDF.Text>
+    </PDF.View>
+  );
+}
+
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const user = await requirePermission("cartas.view");
   const { id } = await ctx.params;
-  const document = await getLetter(
-    user.churchId ?? "",
-    id,
-    await scopedCongregationIdsOrNull(scopeFromUser(user))
-  );
+  const [document, branding] = await Promise.all([
+    getLetter(
+      user.churchId ?? "",
+      id,
+      await scopedCongregationIdsOrNull(scopeFromUser(user))
+    ),
+    getChurchBranding(user.churchId ?? ""),
+  ]);
   if (!document) {
     return new Response("Documento não encontrado.", { status: 404 });
   }
@@ -75,16 +112,22 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   const member = document.member;
   const church = document.church;
 
+  const showDefaultSignatures =
+    !document.signatureName && (branding.pastor.name || branding.secretary.name || branding.pastor.imageUrl || branding.secretary.imageUrl);
+
   const doc = (
     <PDF.Document title={document.title}>
       <PDF.Page size="A4" style={styles.page}>
         <PDF.View style={styles.header}>
-          <PDF.Text style={styles.church}>{church.legalName || church.name}</PDF.Text>
-          <PDF.Text style={styles.meta}>
-            {church.cnpj ? `CNPJ: ${church.cnpj} · ` : ""}
-            {church.phone ? `${church.phone} · ` : ""}
-            {church.email ?? ""}
-          </PDF.Text>
+          {branding.logoUrl ? <PDF.Image src={branding.logoUrl} style={styles.logo} /> : null}
+          <PDF.View style={styles.headerText}>
+            <PDF.Text style={styles.church}>{church.legalName || church.name}</PDF.Text>
+            <PDF.Text style={styles.meta}>
+              {church.cnpj ? `CNPJ: ${church.cnpj} · ` : ""}
+              {church.phone ? `${church.phone} · ` : ""}
+              {church.email ?? ""}
+            </PDF.Text>
+          </PDF.View>
         </PDF.View>
 
         <PDF.Text style={styles.title}>{document.title}</PDF.Text>
@@ -98,15 +141,36 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
           ))}
         </PDF.View>
 
-        <PDF.View style={styles.signRow}>
-          <PDF.Text style={{ marginBottom: 4, fontSize: 10, color: "#475569" }}>
-            {new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "long", year: "numeric" })
-              .format(document.issueDate)}
-          </PDF.Text>
-          <PDF.Text style={styles.signLine}>
-            {document.signatureName || church.name}
-          </PDF.Text>
-        </PDF.View>
+        <PDF.Text style={styles.date}>
+          {new Intl.DateTimeFormat("pt-BR", {
+            day: "2-digit",
+            month: "long",
+            year: "numeric",
+          }).format(document.issueDate)}
+        </PDF.Text>
+
+        {showDefaultSignatures ? (
+          <PDF.View style={styles.signRow} wrap={false}>
+            <SignatureBlock
+              name={branding.pastor.name}
+              role="Pastor(a)"
+              imageUrl={branding.pastor.imageUrl}
+            />
+            <SignatureBlock
+              name={branding.secretary.name}
+              role="Secretário(a)"
+              imageUrl={branding.secretary.imageUrl}
+            />
+          </PDF.View>
+        ) : (
+          <PDF.View style={styles.signRow} wrap={false}>
+            <SignatureBlock
+              name={document.signatureName || church.name}
+              role={document.signatureName ? "Assinatura" : "Igreja"}
+              imageUrl={null}
+            />
+          </PDF.View>
+        )}
 
         <PDF.View style={styles.footer}>
           <PDF.Text>

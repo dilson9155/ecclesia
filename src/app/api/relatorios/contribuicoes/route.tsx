@@ -3,6 +3,7 @@ import * as XLSX from "xlsx";
 import { requirePermission } from "@/lib/rbac";
 import { scopeFromUser, scopedCongregationIdsOrNull } from "@/lib/scope";
 import { auditLog } from "@/services/audit.service";
+import { getChurchBranding } from "@/services/branding.service";
 import {
   contributionsReportCsv,
   contributionsReportSheet,
@@ -16,6 +17,7 @@ import {
   PdfTable,
   ReportFooter,
   ReportHeader,
+  ReportSignatures,
   reportPdfStyles,
 } from "@/components/reports/report-pdf";
 
@@ -40,7 +42,7 @@ export async function GET(request: Request) {
       : undefined;
 
   const { from: fromDefault, to: toDefault } = defaultRange();
-  const [context, report] = await Promise.all([
+  const [context, report, branding] = await Promise.all([
     getReportContext(user.churchId),
     getContributionsReport(user.churchId, {
       from: from ? new Date(`${from}T00:00:00`) : undefined,
@@ -49,6 +51,7 @@ export async function GET(request: Request) {
       congregationIds: allowedIds,
       type,
     }),
+    getChurchBranding(user.churchId),
   ]);
 
   await auditLog({
@@ -122,6 +125,20 @@ export async function GET(request: Request) {
             headers={["Data", "Tipo", "Membro/Contribuinte", "Código", "Congregação", "Valor (R$)"]}
             align={["left", "left", "left", "left", "left", "right"]}
             rows={pdfRows}
+          />
+          <ReportSignatures
+            items={[
+              {
+                name: branding.pastor.name,
+                role: "Pastor(a)",
+                imageUrl: branding.pastor.imageUrl,
+              },
+              {
+                name: branding.treasurer.name,
+                role: "Tesoureiro(a)",
+                imageUrl: branding.treasurer.imageUrl,
+              },
+            ]}
           />
         </PDF.View>
         <ReportFooter context={context} />

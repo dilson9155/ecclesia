@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
-import { Download, FileText, Loader2, Plus, Trash2 } from "lucide-react";
+import { Download, FileText, Loader2, Plus, Settings2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -52,7 +53,7 @@ type FormValues = {
 };
 
 const PLACEHOLDERS =
-  "{nome} · {matricula} · {congregacao} · {igreja} · {cnpj} · {cidade} · {uf} · {batismo} · {admissao} · {data}";
+  "{nome} · {matricula} · {cpf} · {rg} · {nascimento} · {estado_civil} · {congregacao} · {sede} · {igreja} · {cnpj} · {cidade} · {uf} · {endereco} · {bairro} · {cep} · {telefone} · {email} · {batismo} · {admissao} · {cargo} · {ministerio} · {departamento} · {pastor} · {secretario} · {tesoureiro} · {data}";
 
 type Props = {
   letters: LetterRow[];
@@ -60,13 +61,21 @@ type Props = {
   members: MemberOption[];
   canCreate: boolean;
   canDelete: boolean;
+  canManageTemplates: boolean;
 };
 
 function formatDate(d: Date): string {
   return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" }).format(d);
 }
 
-export function CartasManager({ letters, templates, members, canCreate, canDelete }: Props) {
+export function CartasManager({
+  letters,
+  templates,
+  members,
+  canCreate,
+  canDelete,
+  canManageTemplates,
+}: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [deleting, setDeleting] = useState<LetterRow | null>(null);
@@ -135,24 +144,99 @@ export function CartasManager({ letters, templates, members, canCreate, canDelet
         </p>
       )}
 
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Cartas e Declarações</h1>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
+            Cartas e Declarações
+          </h1>
           <p className="text-sm text-muted-foreground">
             Documentos oficiais da igreja com protocolo e assinatura
           </p>
         </div>
-        {canCreate && (
-          <Button onClick={() => setOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Nova carta
-          </Button>
+        <div className="flex w-full flex-col gap-2 min-[420px]:flex-row sm:w-auto">
+          {canManageTemplates && (
+            <Button asChild variant="outline" className="w-full sm:w-auto">
+              <Link href="/cartas/modelos">
+                <Settings2 className="mr-2 h-4 w-4" />
+                Modelos de texto
+              </Link>
+            </Button>
+          )}
+          {canCreate && (
+            <Button onClick={() => setOpen(true)} className="w-full sm:w-auto">
+              <Plus className="mr-2 h-4 w-4" />
+              Nova carta
+            </Button>
+          )}
+        </div>
+      </div>
+
+      <div className="space-y-2 md:hidden">
+        {letters.length === 0 ? (
+          <div className="rounded-lg border bg-card px-3 py-8 text-center text-sm text-muted-foreground">
+            Nenhum documento gerado ainda.
+          </div>
+        ) : (
+          letters.map((letter) => (
+            <div
+              key={letter.id}
+              className="rounded-lg border bg-card p-3 shadow-sm"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold">{letter.title}</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {TYPE_LABELS[letter.type]}
+                  </p>
+                </div>
+                <span className="shrink-0 rounded bg-muted px-2 py-0.5 text-xs font-medium">
+                  {letter.protocol ?? "—"}
+                </span>
+              </div>
+              <dl className="mt-2 grid grid-cols-2 gap-1 text-xs">
+                <div>
+                  <dt className="text-muted-foreground">Membro</dt>
+                  <dd className="truncate font-medium">
+                    {letter.member?.name ?? "—"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Emissão</dt>
+                  <dd className="font-medium">{formatDate(letter.issueDate)}</dd>
+                </div>
+              </dl>
+              <div className="mt-3 flex flex-wrap items-center justify-end gap-1 border-t pt-2">
+                <a
+                  href={`/api/documents/${letter.id}/pdf`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <Button variant="outline" size="sm" className="h-8 px-2 text-xs">
+                    <Download className="mr-1 h-3.5 w-3.5" />
+                    PDF
+                  </Button>
+                </a>
+                {canDelete && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 px-2 text-xs"
+                    disabled={busy}
+                    onClick={() => setDeleting(letter)}
+                  >
+                    <Trash2 className="mr-1 h-3.5 w-3.5 text-destructive" />
+                    Excluir
+                  </Button>
+                )}
+              </div>
+            </div>
+          ))
         )}
       </div>
 
-      <div className="rounded-md border">
+      <div className="hidden rounded-md border md:block">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[700px] border-separate border-spacing-0 text-sm">
             <thead>
               <tr className="border-b bg-muted/50 text-left text-xs uppercase text-muted-foreground">
                 <th className="px-4 py-2.5 font-medium">Protocolo</th>
@@ -160,7 +244,7 @@ export function CartasManager({ letters, templates, members, canCreate, canDelet
                 <th className="px-4 py-2.5 font-medium">Tipo</th>
                 <th className="px-4 py-2.5 font-medium">Membro</th>
                 <th className="px-4 py-2.5 font-medium">Emissão</th>
-                <th className="px-4 py-2.5 text-right font-medium">Ações</th>
+                <th className="sticky right-0 bg-muted px-4 py-2.5 text-right font-medium shadow-[-6px_0_12px_-8px_rgba(0,0,0,0.35)]">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -178,7 +262,7 @@ export function CartasManager({ letters, templates, members, canCreate, canDelet
                   <td className="px-4 py-2.5">{TYPE_LABELS[letter.type]}</td>
                   <td className="px-4 py-2.5">{letter.member?.name ?? "—"}</td>
                   <td className="px-4 py-2.5">{formatDate(letter.issueDate)}</td>
-                  <td className="px-4 py-2.5">
+                  <td className="sticky right-0 bg-background px-4 py-2.5 shadow-[-6px_0_12px_-8px_rgba(0,0,0,0.35)]">
                     <div className="flex items-center justify-end gap-1">
                       <a href={`/api/documents/${letter.id}/pdf`} target="_blank" rel="noreferrer">
                         <Button variant="outline" size="sm" className="h-7 px-2 text-xs">
@@ -201,7 +285,7 @@ export function CartasManager({ letters, templates, members, canCreate, canDelet
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />

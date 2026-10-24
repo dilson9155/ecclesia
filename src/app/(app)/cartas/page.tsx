@@ -16,7 +16,7 @@ export default async function CartasPage() {
   const congregationIds = await scopedCongregationIdsOrNull(scopeFromUser(user));
   const [letters, templates, members] = await Promise.all([
     listLetters(user.churchId, congregationIds),
-    getTemplates(user.churchId),
+    getTemplates(user.churchId, true),
     getMemberOptions(user.churchId, congregationIds),
   ]);
 
@@ -27,6 +27,7 @@ export default async function CartasPage() {
       members={members as never}
       canCreate={await can(user, "cartas.create")}
       canDelete={await can(user, "cartas.delete")}
+      canManageTemplates={await can(user, "cartas.edit")}
     />
   );
 }

@@ -8,7 +8,9 @@ import type { ResourceDef } from "@/modules/registration/definitions";
 import { requirePermission } from "@/lib/rbac";
 import { saveRow, deleteRow } from "@/services/registration.service";
 import { runRowAction } from "@/services/actions.service";
+import { saveTithesBatch, type TitheBatchEntry } from "@/services/tithe-batch.service";
 import { scopeFromUser } from "@/lib/scope";
+import type { PaymentMethod } from "@prisma/client";
 
 const STANDALONE_PATHS: Record<string, string> = {
   membros: "/membros",
@@ -24,7 +26,11 @@ const STANDALONE_PATHS: Record<string, string> = {
 
 function resourcePaths(resourceKey: string): string[] {
   const standalone = STANDALONE_PATHS[resourceKey];
-  return standalone ? [standalone] : [`/estrutura/${resourceKey}`];
+  if (standalone) return [standalone];
+  if (resourceKey === "sedes" || resourceKey === "congregacoes") {
+    return [`/estrutura/${resourceKey}`, "/estrutura"];
+  }
+  return [`/estrutura/${resourceKey}`];
 }
 
 async function authorize(def: ResourceDef, operation: "create" | "update" | "delete") {
@@ -64,6 +70,42 @@ export async function updateRecord(resourceKey: string, id: string, values: Reco
   }
   for (const p of resourcePaths(resourceKey)) revalidatePath(p);
   return { ok: true };
+}
+
+export type TitheBatchActionInput = {
+  congregationId: string;
+  date: string;
+  accountId: string;
+  paymentMethod: PaymentMethod;
+  costCenterId?: string | null;
+  observation?: string | null;
+  entries: TitheBatchEntry[];
+};
+
+export type TitheBatchActionResult =
+  | { ok: true; count: number; total: number }
+  | { ok: false; error: string };
+
+export async function createTithesBatch(
+  input: TitheBatchActionInput
+): Promise<TitheBatchActionResult> {
+  const user = await requirePermission("dizimos.create");
+  if (!user.churchId) return { ok: false, error: "Nenhuma igreja vinculada ao seu usuário." };
+
+  try {
+    const result = await saveTithesBatch(
+      user.churchId,
+      user.id,
+      scopeFromUser(user),
+      input
+    );
+    revalidatePath("/dizimos");
+    revalidatePath("/livro-caixa");
+    revalidatePath("/relatorios/contribuicoes");
+    return { ok: true, count: result.count, total: result.total };
+  } catch (error) {
+    return { ok: false, error: (error as Error).message };
+  }
 }
 
 export async function removeRecord(resourceKey: string, id: string) {

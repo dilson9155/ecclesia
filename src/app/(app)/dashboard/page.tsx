@@ -25,9 +25,30 @@ export default async function DashboardPage() {
   const church = user.churchId
     ? await prisma.church.findUnique({
         where: { id: user.churchId },
-        include: { sedes: { where: { status: "ATIVO" } } },
+        select: { name: true },
       })
     : null;
+
+  const congregationUnit = user.congregationId
+    ? await prisma.congregation.findUnique({
+        where: { id: user.congregationId },
+        select: { name: true, sede: { select: { name: true } } },
+      })
+    : null;
+
+  const sedeUnit =
+    !user.congregationId && user.sedeId
+      ? await prisma.sede.findUnique({
+          where: { id: user.sedeId },
+          select: { name: true },
+        })
+      : null;
+
+  const unitLabel = congregationUnit
+    ? `${congregationUnit.sede.name} · ${congregationUnit.name}`
+    : user.sedeId
+      ? sedeUnit?.name ?? "Sede"
+      : "Todas as sedes";
 
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -123,11 +144,11 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">
+        <h1 className="text-xl font-bold tracking-tight sm:text-2xl">
           Bem-vindo{user.name ? `, ${user.name.split(" ")[0]}` : ""}!
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {church?.name ?? "Sistema"} · {church?.sedes[0]?.name ?? "Sede"} ·{" "}
+          {church?.name ?? "Sistema"} · {unitLabel} ·{" "}
           {now.toLocaleDateString("pt-BR")}
         </p>
       </div>
@@ -142,7 +163,7 @@ export default async function DashboardPage() {
               <card.icon className={`size-4 ${"money" in card && card.money ? "text-primary" : "text-muted-foreground"}`} />
             </CardHeader>
             <CardContent>
-              <p className="text-3xl font-bold">{card.value}</p>
+              <p className="text-2xl font-bold sm:text-3xl">{card.value}</p>
             </CardContent>
           </Card>
         ))}
@@ -178,7 +199,7 @@ export default async function DashboardPage() {
           <CardHeader>
             <CardTitle className="text-base">Resultado do mês (caixa)</CardTitle>
           </CardHeader>
-          <CardContent className="grid grid-cols-3 gap-4">
+          <CardContent className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-3">
             <div>
               <p className="text-xs text-muted-foreground">Entradas</p>
               <p className="text-lg font-semibold text-emerald-600">{formatMoney(monthRevenue, true)}</p>

@@ -56,14 +56,14 @@ export default async function FechamentoPage({ searchParams }: Props) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-end justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-lg font-semibold">Fechamento Mensal</h1>
           <p className="text-sm text-muted-foreground">
             Controle de fechamento do período {String(month).padStart(2, "0")}/{year}
           </p>
         </div>
-        <div className="flex items-center gap-2 text-sm">
+        <div className="flex flex-wrap items-center gap-2 text-sm">
           <a
             href={`?year=${month === 1 ? year - 1 : year}&month=${month === 1 ? 12 : month - 1}`}
             className="rounded border px-2 py-1 hover:bg-muted"

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import type { ReactNode } from "react";
 import { useState } from "react";
 import Link from "next/link";
@@ -7,7 +8,6 @@ import { usePathname } from "next/navigation";
 import {
   Building2,
   BookText,
-  Church,
   CreditCard,
   FileText,
   Gift,
@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { logout } from "@/app/actions/auth";
+import { InstallAppButton } from "@/components/install-app-button";
 import { cn } from "@/lib/utils";
 
 export type NavItem = {
@@ -69,15 +70,19 @@ const NAV_ICONS: Record<NonNullable<NavItem["icon"]>, ReactNode> = {
 
 function Brand() {
   return (
-    <div className="flex items-center gap-2.5 px-4 py-4">
-      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-        <Church className="size-5" />
-      </span>
-      <div className="leading-tight">
-        <p className="text-sm font-semibold tracking-tight text-sidebar-foreground">
+    <div className="flex min-w-0 items-center gap-2.5 px-4 py-4">
+      <Image
+        src="/brand/ecclesia-icon.webp"
+        alt="Ecclesia"
+        width={36}
+        height={36}
+        className="size-9 shrink-0 rounded-lg object-contain"
+      />
+      <div className="min-w-0 leading-tight">
+        <p className="truncate text-sm font-semibold tracking-tight text-sidebar-foreground">
           Ecclesia
         </p>
-        <p className="text-[11px] text-sidebar-foreground/60">
+        <p className="truncate text-[11px] text-sidebar-foreground/60">
           Gestão de Igrejas
         </p>
       </div>
@@ -134,6 +139,7 @@ function NavContent({
 function UserFooter({ userName, userEmail }: { userName: string; userEmail: string }) {
   return (
     <div className="border-t border-sidebar-border p-3">
+      <InstallAppButton className="mb-3 w-full justify-start text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground" />
       <p className="truncate text-xs font-medium text-sidebar-foreground">
         {userName}
       </p>
@@ -185,7 +191,7 @@ export function AppShell({
             className="absolute inset-0 bg-black/50"
             onClick={() => setMobileOpen(false)}
           />
-          <aside className="absolute inset-y-0 left-0 flex w-72 flex-col border-r border-sidebar-border bg-sidebar">
+          <aside className="absolute inset-y-0 left-0 flex w-[min(18rem,85vw)] flex-col border-r border-sidebar-border bg-sidebar">
             <div className="flex items-center justify-between pr-2">
               <Brand />
               <Button
@@ -203,20 +209,23 @@ export function AppShell({
         </div>
       )}
 
-      <div className="lg:pl-64">
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b bg-background/80 px-4 backdrop-blur md:px-6">
-          <div className="flex items-center gap-3">
+      <div className="min-w-0 lg:pl-64">
+        <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-2 border-b bg-background/80 px-3 backdrop-blur sm:px-4 md:px-6">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <Button
               variant="ghost"
               size="icon"
-              className="lg:hidden"
+              className="shrink-0 lg:hidden"
               onClick={() => setMobileOpen(true)}
+              aria-label="Abrir menu"
             >
               <Menu className="h-5 w-5" />
             </Button>
-            <div>
-              <p className="font-semibold leading-none">Painel de gestão</p>
-              <p className="mt-1 text-xs text-muted-foreground">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold leading-none sm:text-base">
+                Painel de gestão
+              </p>
+              <p className="mt-1 hidden truncate text-xs text-muted-foreground sm:block">
                 Administração eclesiástica
               </p>
             </div>
@@ -225,15 +234,17 @@ export function AppShell({
             type="button"
             variant="outline"
             size="sm"
+            className="shrink-0"
+            aria-label="Sair do sistema"
             onClick={async () => {
               await logout();
             }}
           >
-            <LogOut className="mr-2 h-4 w-4" />
-            Sair
+            <LogOut className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Sair</span>
           </Button>
         </header>
-        <main className="p-4 md:p-6">{children}</main>
+        <main className="min-w-0 p-3 sm:p-4 md:p-6">{children}</main>
       </div>
     </div>
   );

@@ -10,6 +10,12 @@ import {
   assertCongregationInScope,
   type DataScope,
 } from "@/lib/scope";
+import {
+  canCreateSede,
+  canDeleteSede,
+  canEditSede,
+  canManageCongregationsIn,
+} from "@/modules/structure/policy";
 
 export type Actor = { userId: string; scope: DataScope };
 
@@ -181,6 +187,292 @@ export function buildData(resourceKey: string, values: Record<string, unknown>) 
   return data;
 }
 
+type ChurchRecordKind = "account" | "costCenter" | "supplier" | "member";
+
+type ChurchRecord = {
+  id: string;
+  churchId: string;
+  congregationId?: string | null;
+};
+
+async function loadChurchRecord(
+  kind: ChurchRecordKind,
+  id: string
+): Promise<ChurchRecord | null> {
+  if (kind === "account") {
+    return prisma.account.findUnique({
+      where: { id },
+      select: { id: true, churchId: true },
+    });
+  }
+  if (kind === "costCenter") {
+    return prisma.costCenter.findUnique({
+      where: { id },
+      select: { id: true, churchId: true, congregationId: true },
+    });
+  }
+  if (kind === "supplier") {
+    return prisma.supplier.findUnique({
+      where: { id },
+      select: { id: true, churchId: true },
+    });
+  }
+  return prisma.member.findUnique({
+    where: { id },
+    select: { id: true, churchId: true, congregationId: true },
+  });
+}
+
+async function assertChurchReference(
+  kind: ChurchRecordKind,
+  id: unknown,
+  scope: DataScope,
+  label: string
+): Promise<ChurchRecord | null> {
+  if (!id) return null;
+  if (!scope.churchId) {
+    throw new Error("Nenhuma igreja vinculada ao seu usuário.");
+  }
+  const record = await loadChurchRecord(kind, String(id));
+  if (!record || record.churchId !== scope.churchId) {
+    throw new Error(`${label} não pertence à sua igreja.`);
+  }
+  if (record.congregationId) {
+    await assertCongregationInScope(scope, record.congregationId);
+  }
+  return record;
+}
+
+/**
+ * Garante que todos os vínculos enviados pelo formulário pertencem à igreja
+ * e ao escopo do usuário. Sem isso, um ID forjado poderia apontar para outra
+ * igreja/congregação mesmo que a tela não mostrasse a opção.
+ */
+async function assertReferencesInScope(
+  resourceKey: string,
+  scope: DataScope,
+  data: Record<string, unknown>,
+  id: string | null
+): Promise<void> {
+  switch (resourceKey) {
+    case "contas": {
+      if (!data.parentId) break;
+      const parent = await assertChurchReference(
+        "account",
+        data.parentId,
+        scope,
+        "Conta pai"
+      );
+      if (parent && id && parent.id === id) {
+        throw new Error("Uma conta não pode ser filha dela mesma.");
+      }
+      break;
+    }
+    case "centrosCusto": {
+      if (data.congregationId) {
+        await assertCongregationInScope(
+          scope,
+          String(data.congregationId)
+        );
+      }
+      break;
+    }
+    case "dizimos":
+    case "ofertas": {
+      await assertChurchReference(
+        "account",
+        data.accountId,
+        scope,
+        "Conta contábil"
+      );
+      if (data.memberId) {
+        await assertChurchReference("member", data.memberId, scope, "Membro");
+      }
+      if (data.costCenterId) {
+        await assertChurchReference(
+          "costCenter",
+          data.costCenterId,
+          scope,
+          "Centro de custo"
+        );
+      }
+      break;
+    }
+    case "entradas":
+    case "saidas": {
+      await assertChurchReference(
+        "account",
+        data.accountId,
+        scope,
+        "Conta contábil"
+      );
+      if (data.costCenterId) {
+        await assertChurchReference(
+          "costCenter",
+          data.costCenterId,
+          scope,
+          "Centro de custo"
+        );
+      }
+      if (data.supplierId) {
+        await assertChurchReference(
+          "supplier",
+          data.supplierId,
+          scope,
+          "Fornecedor"
+        );
+      }
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+/**
+ * Aplica as regras de hierarquia nas escritas de sede/congregação.
+ * A permissão do papel é validada na server action; aqui garantimos que o
+ * escopo de dados também seja respeitado mesmo em chamadas diretas.
+ */
+async function assertStructureWrite(
+  resourceKey: string,
+  scope: DataScope,
+  id: string | null,
+  data: Record<string, unknown>,
+  existing: Row | null
+): Promise<void> {
+  if (!scope.churchId) {
+    throw new Error("Nenhuma igreja vinculada ao seu usuário.");
+  }
+
+  // A estrutura contratada no painel da plataforma limita a criação de unidades.
+  if (
+    (resourceKey === "sedes" && !id) ||
+    (resourceKey === "congregacoes" && !id)
+  ) {
+    const church = await prisma.church.findUnique({
+      where: { id: scope.churchId },
+      select: { structureType: true },
+    });
+    if (church?.structureType === "SEDE_ONLY") {
+      if (resourceKey === "congregacoes") {
+        throw new Error(
+          "O plano desta igreja é somente sede e não permite cadastrar congregações."
+        );
+      }
+      const sedeCount = await prisma.sede.count({
+        where: { churchId: scope.churchId },
+      });
+      if (sedeCount > 0) {
+        throw new Error(
+          "O plano desta igreja permite apenas uma sede. Fale com o administrador da plataforma para alterar o plano."
+        );
+      }
+    }
+  }
+
+  if (resourceKey === "sedes") {
+    if (!id) {
+      if (!canCreateSede(scope)) {
+        throw new Error(
+          "Somente o administrador da igreja pode cadastrar novas sedes."
+        );
+      }
+      return;
+    }
+    if (!canEditSede(scope, String(existing?.id ?? id))) {
+      throw new Error("Você não pode alterar esta sede.");
+    }
+    return;
+  }
+
+  if (resourceKey === "congregacoes") {
+    const sedeId = String(data.sedeId ?? existing?.sedeId ?? "");
+    if (!sedeId) {
+      throw new Error("Campo obrigatório: Sede");
+    }
+    if (!canManageCongregationsIn(scope, sedeId)) {
+      throw new Error("Você só pode gerenciar congregações da sua sede.");
+    }
+    if (id && existing && String(existing.sedeId) !== sedeId) {
+      throw new Error(
+        "Não é possível transferir uma congregação para outra sede."
+      );
+    }
+    const sede = await prisma.sede.findUnique({
+      where: { id: sedeId },
+      select: { churchId: true },
+    });
+    if (!sede || sede.churchId !== scope.churchId) {
+      throw new Error("Sede não encontrada na sua igreja.");
+    }
+  }
+}
+
+async function assertCanDeleteStructure(
+  resourceKey: string,
+  scope: DataScope,
+  existing: Row
+): Promise<void> {
+  const existingId = String(existing.id);
+
+  if (resourceKey === "sedes") {
+    if (!canDeleteSede(scope)) {
+      throw new Error(
+        "Somente o administrador da igreja pode excluir sedes."
+      );
+    }
+    const [congregations, members, users] = await Promise.all([
+      prisma.congregation.count({ where: { sedeId: existingId } }),
+      prisma.member.count({ where: { sedeId: existingId } }),
+      prisma.user.count({ where: { sedeId: existingId } }),
+    ]);
+    if (congregations > 0 || members > 0 || users > 0) {
+      throw new Error(
+        "Não é possível excluir esta sede: remova as congregações, membros e usuários vinculados primeiro."
+      );
+    }
+    return;
+  }
+
+  if (resourceKey === "congregacoes") {
+    const sedeId = String(existing.sedeId ?? "");
+    if (!canManageCongregationsIn(scope, sedeId)) {
+      throw new Error("Você só pode excluir congregações da sua sede.");
+    }
+    const relationCounts = await prisma.congregation.findUnique({
+      where: { id: existingId },
+      select: {
+        _count: {
+          select: {
+            members: true,
+            visitors: true,
+            tithes: true,
+            offerings: true,
+            incomes: true,
+            expenses: true,
+            cashEntries: true,
+            cards: true,
+            documents: true,
+            closings: true,
+            users: true,
+            costCenters: true,
+          },
+        },
+      },
+    });
+    if (!relationCounts) throw new Error("Congregação não encontrada.");
+    const hasLinks = Object.values(relationCounts._count).some(
+      (count) => count > 0
+    );
+    if (hasLinks) {
+      throw new Error(
+        "Não é possível excluir esta congregação: existem membros, registros financeiros ou usuários vinculados."
+      );
+    }
+  }
+}
+
 function scopeFilter(
   resourceKey: string,
   scope: DataScope
@@ -199,12 +491,23 @@ function scopeFilter(
     case "igrejas":
       return Promise.resolve({ id: scope.churchId });
     case "sedes":
-      return Promise.resolve(scope.sedeId ? { id: scope.sedeId } : { id: "__none__" });
+      return Promise.resolve(
+        scope.sedeId
+          ? { id: scope.sedeId, churchId: scope.churchId }
+          : { id: "__none__" }
+      );
     case "congregacoes":
       if (scope.congregationId) {
-        return Promise.resolve({ id: scope.congregationId });
+        return Promise.resolve({
+          id: scope.congregationId,
+          churchId: scope.churchId,
+        });
       }
-      return Promise.resolve(scope.sedeId ? { sedeId: scope.sedeId } : { id: "__none__" });
+      return Promise.resolve(
+        scope.sedeId
+          ? { sedeId: scope.sedeId, churchId: scope.churchId }
+          : { id: "__none__" }
+      );
     case "membros":
     case "visitantes":
     case "dizimos":
@@ -217,8 +520,21 @@ function scopeFilter(
           in: congregationIds.length ? congregationIds : ["__none__"],
         },
       }));
+    case "centrosCusto":
+      // Centros de custo da igreja (sem congregação) + os do escopo do usuário.
+      return scopedCongregationIds(scope).then((congregationIds) => ({
+        ...churchWhere,
+        OR: [
+          { congregationId: null },
+          {
+            congregationId: {
+              in: congregationIds.length ? congregationIds : ["__none__"],
+            },
+          },
+        ],
+      }));
     default:
-      // contas, centrosCusto e fornecedores são referências no nível da igreja
+      // contas e fornecedores são referências no nível da igreja
       return Promise.resolve(churchWhere);
   }
 }
@@ -234,6 +550,12 @@ async function assertScopedRecord(
   }
   if (scopedWhere.churchId && existing.churchId !== scopedWhere.churchId) {
     throw new Error("Registro não pertence à sua igreja.");
+  }
+  if (
+    typeof scopedWhere.sedeId === "string" &&
+    existing.sedeId !== scopedWhere.sedeId
+  ) {
+    throw new Error("Registro não pertence à sua sede.");
   }
   if (typeof existing.congregationId === "string") {
     await assertCongregationInScope(scope, existing.congregationId);
@@ -260,6 +582,10 @@ export async function listRows(
     for (const f of def.fields) {
       if (f.type === "date" && row[f.key] instanceof Date) {
         out[f.key] = (row[f.key] as Date).toISOString().slice(0, 10);
+        continue;
+      }
+      if (f.type === "decimal" && row[f.key] != null) {
+        out[f.key] = Number(row[f.key]);
         continue;
       }
       out[f.key] = row[f.key] as unknown;
@@ -405,6 +731,8 @@ export async function saveRow(
     existing = found;
   }
 
+  await assertStructureWrite(resourceKey, actor.scope, id, data, existing);
+  await assertReferencesInScope(resourceKey, actor.scope, data, id);
   await assertLedgerPeriodOpen(resourceKey, data);
 
   async function saveLedgerRow(tx: {
@@ -487,6 +815,7 @@ export async function deleteRow(
   const existing = await delegate.findUnique({ where: { id } });
   if (!existing) throw new Error("Registro não encontrado.");
   await assertScopedRecord(resourceKey, actor.scope, existing);
+  await assertCanDeleteStructure(resourceKey, actor.scope, existing);
 
   if (resourceKey === "saidas" && existing.status === "PAGO") {
     throw new Error("Saída paga não pode ser excluída. Cancele antes.");

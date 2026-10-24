@@ -43,6 +43,10 @@ type Props = {
   fields: FieldDef[];
   rows: Record<string, unknown>[];
   canWrite: boolean;
+  canCreate?: boolean;
+  canEdit?: boolean;
+  canDelete?: boolean;
+  newLabel?: string;
   actions?: RowActionDef[];
   relationOptions?: Record<string, Option[]>;
 };
@@ -102,9 +106,17 @@ export function CrudManager({
   fields,
   rows,
   canWrite,
+  canCreate,
+  canEdit,
+  canDelete,
+  newLabel,
   actions = [],
   relationOptions = {},
 }: Props) {
+  const allowCreate = canCreate ?? canWrite;
+  const allowEdit = canEdit ?? canWrite;
+  const allowDelete = canDelete ?? canWrite;
+  const createLabel = newLabel ?? `Novo ${singular}`;
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<Record<string, unknown> | null>(null);
@@ -178,36 +190,142 @@ export function CrudManager({
   }
 
   const tableFields = visibleFields.filter((f) => !STATUS_KEYS.includes(f.key));
+  const primaryField =
+    tableFields.find((f) => f.key === "name") ??
+    tableFields.find((f) => f.key === "description") ??
+    tableFields[0];
+  const secondaryFields = tableFields.filter((f) => f.key !== primaryField?.key);
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{plural}</h1>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
+            {plural}
+          </h1>
           <p className="text-sm text-muted-foreground">{description}</p>
         </div>
-        {canWrite && (
-          <Button onClick={openCreate}>
+        {allowCreate && (
+          <Button onClick={openCreate} className="w-full shrink-0 sm:w-auto">
             <Plus className="mr-2 h-4 w-4" />
-            Novo {singular}
+            {createLabel}
           </Button>
-        )}
-      {actionError && (
-          <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-            {actionError}
-          </p>
         )}
       </div>
 
-      <div className="rounded-md border">
-        <Table>
+      {actionError && (
+        <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+          {actionError}
+        </p>
+      )}
+
+      <div className="space-y-2 md:hidden">
+        {rows.length === 0 ? (
+          <div className="rounded-lg border bg-card px-3 py-8 text-center text-sm text-muted-foreground">
+            Nenhum registro cadastrado.
+          </div>
+        ) : (
+          rows.map((row) => (
+            <div
+              key={row.id as string}
+              className="rounded-lg border bg-card p-3 shadow-sm"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold">
+                    {primaryField
+                      ? formatValue(
+                          resourceKey,
+                          primaryField,
+                          row[primaryField.key],
+                          relationLabels[primaryField.key]
+                        )
+                      : "Registro"}
+                  </p>
+                  {primaryField && primaryField.key !== "name" && (
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                      {primaryField.label}
+                    </p>
+                  )}
+                </div>
+                {statusField && statusKey && (
+                  <div className="shrink-0">
+                    {statusBadge(statusField, row[statusKey])}
+                  </div>
+                )}
+              </div>
+
+              {secondaryFields.length > 0 && (
+                <dl className="mt-3 grid grid-cols-1 gap-1 text-xs min-[420px]:grid-cols-2">
+                  {secondaryFields.map((f) => (
+                    <div
+                      key={f.key}
+                      className="flex min-w-0 items-start justify-between gap-2 rounded-md bg-muted/40 px-2 py-1.5"
+                    >
+                      <dt className="shrink-0 text-muted-foreground">{f.label}</dt>
+                      <dd className="min-w-0 break-words text-right font-medium">
+                        {formatValue(
+                          resourceKey,
+                          f,
+                          row[f.key],
+                          relationLabels[f.key]
+                        )}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+
+              <div className="mt-3 flex flex-wrap items-center justify-end gap-1 border-t pt-2">
+                {actions.map((a) => (
+                  <Button
+                    key={a.key}
+                    variant="outline"
+                    size="sm"
+                    className="h-8 px-2 text-xs"
+                    disabled={busy}
+                    onClick={() => handleRowAction(row.id as string, a.key)}
+                  >
+                    {a.label}
+                  </Button>
+                ))}
+                {allowEdit && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 px-2 text-xs"
+                    onClick={() => openEdit(row)}
+                  >
+                    <Pencil className="mr-1 h-3.5 w-3.5" />
+                    Editar
+                  </Button>
+                )}
+                {allowDelete && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 px-2 text-xs"
+                    onClick={() => setDeleting(row)}
+                  >
+                    <Trash2 className="mr-1 h-3.5 w-3.5 text-destructive" />
+                    Excluir
+                  </Button>
+                )}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      <div className="hidden rounded-md border md:block">
+        <Table className="border-separate border-spacing-0">
           <TableHeader>
             <TableRow>
               {tableFields.map((f) => (
                 <TableHead key={f.key}>{f.label}</TableHead>
               ))}
               {statusField && <TableHead>Situação</TableHead>}
-              <TableHead className="text-right">Ações</TableHead>
+              <TableHead className="sticky right-0 bg-muted text-right shadow-[-6px_0_12px_-8px_rgba(0,0,0,0.35)]">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -235,7 +353,7 @@ export function CrudManager({
                   {statusField && statusKey && (
                     <TableCell>{statusBadge(statusField, row[statusKey])}</TableCell>
                   )}
-                  <TableCell className="text-right">
+                  <TableCell className="sticky right-0 bg-background text-right shadow-[-6px_0_12px_-8px_rgba(0,0,0,0.35)]">
                     <div className="flex items-center justify-end gap-1">
                       {actions.map((a) => (
                         <Button
@@ -249,15 +367,15 @@ export function CrudManager({
                           {a.label}
                         </Button>
                       ))}
-                      {canWrite && (
-                        <>
-                          <Button variant="ghost" size="icon" onClick={() => openEdit(row)}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => setDeleting(row)}>
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </>
+                      {allowEdit && (
+                        <Button variant="ghost" size="icon" onClick={() => openEdit(row)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {allowDelete && (
+                        <Button variant="ghost" size="icon" onClick={() => setDeleting(row)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
                       )}
                     </div>
                   </TableCell>
@@ -272,7 +390,7 @@ export function CrudManager({
         <DialogContent className="max-h-[85dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {editingId ? `Editar ${singular}` : `Novo ${singular}`}
+              {editingId ? `Editar ${singular}` : createLabel}
             </DialogTitle>
             <DialogDescription>
               Preencha os dados do cadastro.

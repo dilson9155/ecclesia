@@ -250,16 +250,18 @@ export function UsuariosManager({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Usuários</h1>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
+            Usuários
+          </h1>
           <p className="text-sm text-muted-foreground">
             Acessos ao sistema com e-mail, senha e permissões por sede e
             congregação
           </p>
         </div>
         {canManage && (
-          <Button onClick={openCreate}>
+          <Button onClick={openCreate} className="w-full shrink-0 sm:w-auto">
             <Plus className="mr-2 h-4 w-4" />
             Novo usuário
           </Button>
@@ -272,8 +274,108 @@ export function UsuariosManager({
         </p>
       )}
 
-      <div className="rounded-md border">
-        <Table>
+      <div className="space-y-2 md:hidden">
+        {users.length === 0 ? (
+          <div className="rounded-lg border bg-card px-3 py-8 text-center text-sm text-muted-foreground">
+            Nenhum usuário cadastrado.
+          </div>
+        ) : (
+          users.map((row) => (
+            <div
+              key={row.id}
+              className="rounded-lg border bg-card p-3 shadow-sm"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="flex items-center gap-1.5 truncate text-sm font-semibold">
+                    <UserRound className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    {row.name}
+                  </p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {row.email}
+                  </p>
+                </div>
+                <Badge
+                  variant={row.active ? "default" : "secondary"}
+                  className="shrink-0"
+                >
+                  {row.active ? "Ativo" : "Inativo"}
+                </Badge>
+              </div>
+
+              <div className="mt-2 flex flex-wrap gap-1">
+                {row.roles.map((r) => (
+                  <Badge key={r} variant="outline">
+                    {ROLE_LABELS[r] ?? r}
+                  </Badge>
+                ))}
+                {row.id === currentUserId && (
+                  <Badge variant="secondary">Você</Badge>
+                )}
+              </div>
+
+              <dl className="mt-2 grid grid-cols-2 gap-1 text-xs">
+                <div>
+                  <dt className="text-muted-foreground">Sede</dt>
+                  <dd className="truncate font-medium">{row.sedeName ?? "—"}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Congregação</dt>
+                  <dd className="truncate font-medium">
+                    {row.congregationName ?? "—"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Último acesso</dt>
+                  <dd className="font-medium">{formatDate(row.lastLoginAt)}</dd>
+                </div>
+              </dl>
+
+              {canManage && (
+                <div className="mt-3 flex flex-wrap items-center justify-end gap-1 border-t pt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 px-2 text-xs"
+                    disabled={busy}
+                    onClick={() => setResetTarget(row)}
+                  >
+                    <KeyRound className="mr-1 h-3.5 w-3.5" />
+                    Senha
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 px-2 text-xs"
+                    disabled={busy}
+                    onClick={() => openEdit(row)}
+                  >
+                    <Pencil className="mr-1 h-3.5 w-3.5" />
+                    Editar
+                  </Button>
+                  {row.id !== currentUserId && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 px-2 text-xs"
+                      disabled={busy}
+                      onClick={() => handleToggle(row)}
+                    >
+                      <Power
+                        className={`mr-1 h-3.5 w-3.5 ${row.active ? "text-destructive" : "text-emerald-600"}`}
+                      />
+                      {row.active ? "Desativar" : "Ativar"}
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+
+      <div className="hidden rounded-md border md:block">
+        <Table className="border-separate border-spacing-0">
           <TableHeader>
             <TableRow>
               <TableHead>Nome</TableHead>
@@ -283,7 +385,11 @@ export function UsuariosManager({
               <TableHead>Congregação</TableHead>
               <TableHead>Último acesso</TableHead>
               <TableHead>Situação</TableHead>
-              {canManage && <TableHead className="text-right">Ações</TableHead>}
+              {canManage && (
+                <TableHead className="sticky right-0 bg-muted text-right shadow-[-6px_0_12px_-8px_rgba(0,0,0,0.35)]">
+                  Ações
+                </TableHead>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -329,7 +435,7 @@ export function UsuariosManager({
                     </Badge>
                   </TableCell>
                   {canManage && (
-                    <TableCell className="text-right">
+                    <TableCell className="sticky right-0 bg-background text-right shadow-[-6px_0_12px_-8px_rgba(0,0,0,0.35)]">
                       <div className="flex items-center justify-end gap-1">
                         <Button
                           variant="outline"

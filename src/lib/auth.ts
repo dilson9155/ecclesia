@@ -49,6 +49,25 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const passwordOk = await bcrypt.compare(password, user.passwordHash);
         if (!passwordOk) return null;
 
+        // Usuários de igrejas suspensas ou com assinatura bloqueada não entram.
+        if (user.churchId && !user.isPlatformAdmin) {
+          const church = await prisma.church.findUnique({
+            where: { id: user.churchId },
+            select: {
+              status: true,
+              subscription: { select: { status: true } },
+            },
+          });
+          if (!church || church.status !== "ATIVO") return null;
+          const blockedStatuses = ["SUSPENDED", "CANCELED", "EXPIRED"];
+          if (
+            church.subscription &&
+            blockedStatuses.includes(church.subscription.status)
+          ) {
+            return null;
+          }
+        }
+
         void prisma.user
           .update({
             where: { id: user.id },
@@ -70,6 +89,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           churchId: user.churchId,
           sedeId: user.sedeId,
           congregationId: user.congregationId,
+          isPlatformAdmin: user.isPlatformAdmin,
         };
       },
     }),
@@ -82,6 +102,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.churchId = user.churchId ?? null;
         token.sedeId = user.sedeId ?? null;
         token.congregationId = user.congregationId ?? null;
+        token.isPlatformAdmin = user.isPlatformAdmin ?? false;
       }
       return token;
     },
@@ -93,6 +114,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.churchId = token.churchId ?? null;
         session.user.sedeId = token.sedeId ?? null;
         session.user.congregationId = token.congregationId ?? null;
+        session.user.isPlatformAdmin = token.isPlatformAdmin ?? false;
       }
       return session;
     },

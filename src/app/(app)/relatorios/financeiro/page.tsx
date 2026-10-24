@@ -59,26 +59,26 @@ export default async function RelatorioFinanceiroPage({ searchParams }: Props) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-lg font-semibold">Relatório Financeiro</h1>
+          <h1 className="text-xl font-semibold sm:text-2xl">Relatório Financeiro</h1>
           <p className="text-sm text-muted-foreground">
             {congLabel} · {rangeLabel}
           </p>
         </div>
         {canExport && (
-          <div className="flex flex-wrap gap-2">
-            <Button asChild variant="outline" size="sm">
+          <div className="flex w-full flex-wrap gap-2 sm:w-auto">
+            <Button asChild variant="outline" size="sm" className="flex-1 sm:flex-none">
               <a href={`/api/relatorios/financeiro?fmt=pdf&${query}`}>
                 <FileText className="mr-2 h-4 w-4" /> PDF
               </a>
             </Button>
-            <Button asChild variant="outline" size="sm">
+            <Button asChild variant="outline" size="sm" className="flex-1 sm:flex-none">
               <a href={`/api/relatorios/financeiro?fmt=xlsx&${query}`}>
                 <FileSpreadsheet className="mr-2 h-4 w-4" /> Excel
               </a>
             </Button>
-            <Button asChild variant="outline" size="sm">
+            <Button asChild variant="outline" size="sm" className="flex-1 sm:flex-none">
               <a href={`/api/relatorios/financeiro?fmt=csv&${query}`}>
                 <Download className="mr-2 h-4 w-4" /> CSV
               </a>
@@ -87,8 +87,8 @@ export default async function RelatorioFinanceiroPage({ searchParams }: Props) {
         )}
       </div>
 
-      <form method="get" className="flex flex-wrap items-end gap-3">
-        <div>
+      <form method="get" className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+        <div className="min-w-0 flex-1 sm:flex-none">
           <label htmlFor="from" className="mb-1 block text-xs font-medium text-muted-foreground">
             De
           </label>
@@ -97,10 +97,10 @@ export default async function RelatorioFinanceiroPage({ searchParams }: Props) {
             name="from"
             type="date"
             defaultValue={from}
-            className="rounded-md border bg-background px-3 py-1.5 text-sm"
+            className="w-full rounded-md border bg-background px-3 py-1.5 text-base sm:w-auto sm:text-sm"
           />
         </div>
-        <div>
+        <div className="min-w-0 flex-1 sm:flex-none">
           <label htmlFor="to" className="mb-1 block text-xs font-medium text-muted-foreground">
             Até
           </label>
@@ -109,10 +109,10 @@ export default async function RelatorioFinanceiroPage({ searchParams }: Props) {
             name="to"
             type="date"
             defaultValue={to}
-            className="rounded-md border bg-background px-3 py-1.5 text-sm"
+            className="w-full rounded-md border bg-background px-3 py-1.5 text-base sm:w-auto sm:text-sm"
           />
         </div>
-        <div>
+        <div className="min-w-0 flex-1 sm:flex-none">
           <label htmlFor="congregationId" className="mb-1 block text-xs font-medium text-muted-foreground">
             Congregação
           </label>
@@ -120,7 +120,7 @@ export default async function RelatorioFinanceiroPage({ searchParams }: Props) {
             id="congregationId"
             name="congregationId"
             defaultValue={congregationId}
-            className="rounded-md border bg-background px-3 py-1.5 text-sm"
+            className="w-full rounded-md border bg-background px-3 py-1.5 text-base sm:w-auto sm:text-sm"
           >
             <option value="">Todas</option>
             {congregations.map((c) => (
@@ -130,18 +130,18 @@ export default async function RelatorioFinanceiroPage({ searchParams }: Props) {
             ))}
           </select>
         </div>
-        <Button type="submit" size="sm">
+        <Button type="submit" size="sm" className="w-full sm:w-auto">
           Filtrar
         </Button>
       </form>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 min-[420px]:grid-cols-3">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Entradas</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-emerald-600">{formatMoney(report.totals.revenue, true)}</p>
+            <p className="text-2xl font-bold text-emerald-600 sm:text-3xl">{formatMoney(report.totals.revenue, true)}</p>
           </CardContent>
         </Card>
         <Card>
@@ -149,7 +149,7 @@ export default async function RelatorioFinanceiroPage({ searchParams }: Props) {
             <CardTitle className="text-sm font-medium text-muted-foreground">Saídas</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-red-600">{formatMoney(report.totals.expense, true)}</p>
+            <p className="text-2xl font-bold text-red-600 sm:text-3xl">{formatMoney(report.totals.expense, true)}</p>
           </CardContent>
         </Card>
         <Card>
@@ -157,7 +157,7 @@ export default async function RelatorioFinanceiroPage({ searchParams }: Props) {
             <CardTitle className="text-sm font-medium text-muted-foreground">Saldo do período</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">{formatMoney(report.totals.balance, true)}</p>
+            <p className="text-2xl font-bold sm:text-3xl">{formatMoney(report.totals.balance, true)}</p>
           </CardContent>
         </Card>
       </div>
@@ -185,7 +185,7 @@ export default async function RelatorioFinanceiroPage({ searchParams }: Props) {
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto rounded-md border">
-                <table className="w-full text-sm">
+                <table className="w-full min-w-[560px] text-sm">
                   <thead className="bg-muted/50 text-left text-xs uppercase text-muted-foreground">
                     <tr>
                       <th className="p-2">Conta</th>

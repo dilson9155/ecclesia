@@ -59,6 +59,7 @@ export type ReportContext = {
   churchName: string;
   churchCnpj: string | null;
   sedeName: string | null;
+  logoUrl: string | null;
 };
 
 function toMonthKey(d: Date): string {
@@ -72,9 +73,10 @@ export async function getReportContext(churchId: string): Promise<ReportContext>
   });
   return {
     churchId,
-    churchName: church?.name ?? "Igreja",
+    churchName: church?.legalName || church?.name || "Igreja",
     churchCnpj: church?.cnpj ?? null,
     sedeName: church?.sedes[0]?.name ?? null,
+    logoUrl: church?.logoUrl ?? null,
   };
 }
 

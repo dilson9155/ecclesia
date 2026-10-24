@@ -70,16 +70,16 @@ export function LivroCaixaClient({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
-          <label htmlFor="month" className="text-sm font-medium">
+          <label htmlFor="month" className="shrink-0 text-sm font-medium">
             Mês:
           </label>
           <select
             id="month"
             value={selectedMonth}
             onChange={(e) => setSelectedMonth(e.target.value)}
-            className="rounded-md border bg-background px-3 py-1.5 text-sm"
+            className="min-w-0 flex-1 rounded-md border bg-background px-3 py-1.5 text-base sm:flex-none sm:text-sm"
           >
             {months.map(([key, label]) => (
               <option key={key} value={key}>
@@ -89,7 +89,7 @@ export function LivroCaixaClient({
           </select>
         </div>
         {canExport && selectedMonth && (
-          <Button asChild variant="outline" size="sm">
+          <Button asChild variant="outline" size="sm" className="w-full sm:w-auto">
             <a href={`/api/livro-caixa/export?month=${selectedMonth}`}>
               <Download className="mr-2 h-4 w-4" />
               Exportar CSV
@@ -98,8 +98,75 @@ export function LivroCaixaClient({
         )}
       </div>
 
-      <div className="overflow-x-auto rounded-md border">
-        <table className="w-full text-sm">
+      <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-3 md:hidden">
+        <div className="rounded-lg border bg-card p-2.5">
+          <p className="text-[11px] text-muted-foreground">Entradas</p>
+          <p className="mt-1 text-sm font-semibold text-emerald-600">
+            {formatMoney(totalEntradas, true)}
+          </p>
+        </div>
+        <div className="rounded-lg border bg-card p-2.5">
+          <p className="text-[11px] text-muted-foreground">Saídas</p>
+          <p className="mt-1 text-sm font-semibold text-destructive">
+            {formatMoney(totalSaidas, true)}
+          </p>
+        </div>
+        <div className="rounded-lg border bg-card p-2.5">
+          <p className="text-[11px] text-muted-foreground">Saldo</p>
+          <p className="mt-1 text-sm font-semibold">
+            {formatMoney(totalEntradas - totalSaidas, true)}
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-2 md:hidden">
+        {rowsWithBalance.length === 0 ? (
+          <div className="rounded-lg border bg-card px-3 py-8 text-center text-sm text-muted-foreground">
+            Nenhum lançamento neste mês.
+          </div>
+        ) : (
+          rowsWithBalance.map((r) => (
+            <div key={r.id} className="rounded-lg border bg-card p-3 shadow-sm">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold">
+                    {r.description}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {new Date(r.date + "T00:00:00").toLocaleDateString("pt-BR")}
+                    {r.document ? ` · Doc. ${r.document}` : ""}
+                  </p>
+                </div>
+                <span
+                  className={`shrink-0 text-sm font-semibold ${
+                    r.nature === "ENTRADA" ? "text-emerald-600" : "text-destructive"
+                  }`}
+                >
+                  {r.nature === "ENTRADA" ? "+" : "−"}
+                  {formatMoney(r.value, true)}
+                </span>
+              </div>
+              <dl className="mt-2 grid grid-cols-2 gap-1 text-xs">
+                <div>
+                  <dt className="text-muted-foreground">Conta</dt>
+                  <dd className="truncate font-medium">{r.account ?? "—"}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Centro de custo</dt>
+                  <dd className="truncate font-medium">{r.costCenter ?? "—"}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Saldo acumulado</dt>
+                  <dd className="font-medium">{formatMoney(r.balance, true)}</dd>
+                </div>
+              </dl>
+            </div>
+          ))
+        )}
+      </div>
+
+      <div className="hidden overflow-x-auto rounded-md border md:block">
+        <table className="w-full min-w-[820px] text-sm">
           <thead className="bg-muted/50 text-left text-xs uppercase text-muted-foreground">
             <tr>
               <th className="p-2">Data</th>

@@ -31,6 +31,7 @@ export type ResourceDef = {
   canCreate: boolean;
   canDelete: boolean;
   standalone?: boolean;
+  newLabel?: string;
   actions?: RowActionDef[];
   fields: FieldDef[];
 };
@@ -145,6 +146,7 @@ export const RESOURCES: ResourceDef[] = [
     deletePermission: "sedes.manage",
     canCreate: true,
     canDelete: true,
+    newLabel: "Nova sede",
     fields: [
       { key: "name", label: "Nome", type: "text", required: true },
       { key: "cnpj", label: "CNPJ", type: "text", hint: "Somente números" },
@@ -169,6 +171,7 @@ export const RESOURCES: ResourceDef[] = [
     deletePermission: "congregacoes.delete",
     canCreate: true,
     canDelete: true,
+    newLabel: "Nova congregação",
     fields: [
       { key: "code", label: "Código", type: "text", required: true, hint: "Ex.: 002" },
       {

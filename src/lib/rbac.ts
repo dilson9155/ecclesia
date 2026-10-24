@@ -16,7 +16,20 @@ export async function currentUser(): Promise<SessionUser | null> {
     churchId: user.churchId ?? null,
     sedeId: user.sedeId ?? null,
     congregationId: user.congregationId ?? null,
+    isPlatformAdmin: user.isPlatformAdmin ?? false,
   };
+}
+
+/** Guard do painel da plataforma (SaaS). Não exige vínculo com igreja. */
+export async function requirePlatformAdmin(): Promise<SessionUser> {
+  const user = await currentUser();
+  if (!user) {
+    redirect("/login");
+  }
+  if (!user.isPlatformAdmin) {
+    redirect("/forbidden");
+  }
+  return user;
 }
 
 export async function requireAuth(): Promise<SessionUser> {

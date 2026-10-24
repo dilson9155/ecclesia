@@ -10,6 +10,7 @@ declare module "next-auth" {
       churchId?: string | null;
       sedeId?: string | null;
       congregationId?: string | null;
+      isPlatformAdmin?: boolean;
     } & DefaultSession["user"];
   }
 
@@ -19,6 +20,7 @@ declare module "next-auth" {
     churchId?: string | null;
     sedeId?: string | null;
     congregationId?: string | null;
+    isPlatformAdmin?: boolean;
   }
 }
 
@@ -29,6 +31,7 @@ declare module "next-auth/jwt" {
     churchId?: string | null;
     sedeId?: string | null;
     congregationId?: string | null;
+    isPlatformAdmin?: boolean;
   }
 }
 
@@ -41,4 +44,5 @@ export type SessionUser = {
   churchId?: string | null;
   sedeId?: string | null;
   congregationId?: string | null;
+  isPlatformAdmin?: boolean;
 };

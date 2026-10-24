@@ -3,6 +3,11 @@ import { getResource } from "@/modules/registration/definitions";
 import { requirePermission, can } from "@/lib/rbac";
 import { listRows, getRelationOptions } from "@/services/registration.service";
 import { scopeFromUser } from "@/lib/scope";
+import {
+  canCreateSede,
+  canDeleteSede,
+  canManageCongregations,
+} from "@/modules/structure/policy";
 import { CrudManager } from "@/components/crud/crud-manager";
 
 export const dynamic = "force-dynamic";
@@ -19,15 +24,31 @@ export default async function ResourcePage({
   const user = await requirePermission(def.viewPermission);
   if (!user.churchId) notFound();
 
+  const scope = scopeFromUser(user);
   const [rows, relationOptions] = await Promise.all([
-    listRows(resource, scopeFromUser(user)),
-    getRelationOptions(resource, scopeFromUser(user)),
+    listRows(resource, scope),
+    getRelationOptions(resource, scope),
   ]);
 
-  const canWrite =
-    (await can(user, def.createPermission)) ||
-    (await can(user, def.editPermission)) ||
-    (await can(user, def.deletePermission));
+  let canCreate = def.canCreate && (await can(user, def.createPermission));
+  let canEdit = await can(user, def.editPermission);
+  let canDelete = def.canDelete && (await can(user, def.deletePermission));
+
+  if (resource === "sedes") {
+    canCreate = canCreate && canCreateSede(scope);
+    canEdit =
+      canEdit &&
+      (scope.isSuperAdmin ||
+        (Boolean(scope.sedeId) && !scope.congregationId));
+    canDelete = canDelete && canDeleteSede(scope);
+  } else if (resource === "congregacoes") {
+    const manage = canManageCongregations(scope);
+    canCreate = canCreate && manage;
+    canEdit = canEdit && manage;
+    canDelete = canDelete && manage;
+  }
+
+  const canWrite = canCreate || canEdit || canDelete;
 
   return (
     <CrudManager
@@ -38,6 +59,10 @@ export default async function ResourcePage({
       fields={def.fields}
       rows={rows}
       canWrite={canWrite}
+      canCreate={canCreate}
+      canEdit={canEdit}
+      canDelete={canDelete}
+      newLabel={def.newLabel}
       relationOptions={relationOptions}
     />
   );

@@ -22,24 +22,59 @@ export async function listCards(
     where: { churchId, ...congregationIn(congregationIds) },
     orderBy: { createdAt: "desc" },
     include: {
-      member: { select: { id: true, name: true, code: true } },
+      member: { select: { id: true, name: true, code: true, cpf: true, cargo: true } },
       congregation: { select: { id: true, name: true } },
     },
   });
 }
 
-export async function getCard(churchId: string, cardId: string) {
+export async function getCard(
+  churchId: string,
+  cardId: string,
+  congregationIds?: string[] | null
+) {
   return prisma.membershipCard.findFirst({
-    where: { id: cardId, churchId },
+    where: {
+      id: cardId,
+      churchId,
+      status: "ATIVO",
+      ...congregationIn(congregationIds),
+    },
     include: {
       member: {
         include: {
           congregation: { select: { id: true, name: true, city: true, state: true } },
         },
       },
-      congregation: true,
+      congregation: { include: { sede: true } },
       church: true,
     },
+  });
+}
+
+export async function getCardsForPdf(
+  churchId: string,
+  cardIds: string[],
+  congregationIds?: string[] | null
+) {
+  if (cardIds.length === 0) return [];
+  return prisma.membershipCard.findMany({
+    where: {
+      churchId,
+      id: { in: cardIds },
+      status: "ATIVO",
+      ...congregationIn(congregationIds),
+    },
+    include: {
+      member: {
+        include: {
+          congregation: { select: { id: true, name: true, city: true, state: true } },
+        },
+      },
+      congregation: { include: { sede: true } },
+      church: true,
+    },
+    orderBy: { createdAt: "asc" },
   });
 }
 
@@ -54,41 +89,61 @@ export async function getMemberOptionList(
       id: true,
       name: true,
       code: true,
+      situation: true,
+      congregationId: true,
       congregation: { select: { name: true } },
     },
   });
 }
 
-export async function issueCard(
+export async function issueCards(
   churchId: string,
   userId: string,
-  memberId: string,
+  memberIds: string[],
   scope?: DataScope
 ) {
-  const member = await prisma.member.findUnique({
-    where: { id: memberId },
+  const uniqueIds = Array.from(new Set(memberIds.filter(Boolean)));
+  if (uniqueIds.length === 0) throw new Error("Selecione pelo menos um membro.");
+  if (uniqueIds.length > 200) {
+    throw new Error("Selecione no máximo 200 membros por lote.");
+  }
+
+  const members = await prisma.member.findMany({
+    where: { id: { in: uniqueIds }, churchId },
     include: { congregation: true },
   });
-  if (!member) throw new Error("Membro não encontrado.");
-  if (member.churchId !== churchId) {
-    throw new Error("Registro não pertence à sua igreja.");
+  if (members.length !== uniqueIds.length) {
+    throw new Error("Um ou mais membros não foram encontrados na sua igreja.");
   }
+
   if (scope) {
-    await assertCongregationInScope(scope, member.congregationId);
+    for (const member of members) {
+      await assertCongregationInScope(scope, member.congregationId);
+    }
   }
 
   const count = await prisma.membershipCard.count({ where: { churchId } });
-  const card = await prisma.membershipCard.create({
-    data: {
-      churchId,
-      congregationId: member.congregationId,
-      memberId,
-      cardNumber: String(count + 1).padStart(6, "0"),
-      validityDate: issueDate(),
-      status: "ATIVO",
-      qrToken: randomUUID(),
-      createdById: userId,
-    },
+  const validityDate = issueDate();
+
+  const cards = await prisma.$transaction(async (tx) => {
+    const created = [];
+    for (const [index, member] of members.entries()) {
+      created.push(
+        await tx.membershipCard.create({
+          data: {
+            churchId,
+            congregationId: member.congregationId,
+            memberId: member.id,
+            cardNumber: String(count + index + 1).padStart(6, "0"),
+            validityDate,
+            status: "ATIVO",
+            qrToken: randomUUID(),
+            createdById: userId,
+          },
+        })
+      );
+    }
+    return created;
   });
 
   await auditLog({
@@ -97,28 +152,34 @@ export async function issueCard(
     action: "CREATE",
     module: "carteirinhas",
     entity: "Carteirinha",
-    entityId: card.id,
-    description: `Carteirinha emitida para ${member.name}`,
+    description:
+      cards.length === 1
+        ? `Carteirinha emitida para ${members[0].name}`
+        : `${cards.length} carteirinhas emitidas em lote`,
+    newValues: { count: cards.length, memberIds: uniqueIds },
   });
-  await auditLog({
-    userId,
-    churchId,
-    action: "PRINT",
-    module: "carteirinhas",
-    entity: "Carteirinha",
-    entityId: card.id,
-    description: `Carteirinha ${card.cardNumber} impressa/gerada`,
-  });
+
+  return cards;
+}
+
+export async function issueCard(
+  churchId: string,
+  userId: string,
+  memberId: string,
+  scope?: DataScope
+) {
+  const [card] = await issueCards(churchId, userId, [memberId], scope);
   return card;
 }
 
 export async function cancelCard(
   churchId: string,
   userId: string,
-  cardId: string
+  cardId: string,
+  congregationIds?: string[] | null
 ) {
   const card = await prisma.membershipCard.findFirst({
-    where: { id: cardId, churchId },
+    where: { id: cardId, churchId, ...congregationIn(congregationIds) },
     include: { member: { select: { name: true } } },
   });
   if (!card) throw new Error("Carteirinha não encontrada.");

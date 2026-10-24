@@ -1,7 +1,14 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { decode } from "next-auth/jwt";
 
-const PUBLIC_PATHS = new Set(["/", "/login"]);
+const PUBLIC_PATHS = new Set([
+  "/",
+  "/login",
+  "/recuperar-senha",
+  "/redefinir-senha",
+  "/manifest.webmanifest",
+  "/sw.js",
+]);
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -11,6 +18,7 @@ export async function proxy(request: NextRequest) {
   const secret = process.env.AUTH_SECRET;
 
   let isAuthenticated = false;
+  let isPlatformAdmin = false;
   if (secret) {
     const secure =
       request.nextUrl.protocol === "https:" ||
@@ -24,8 +32,10 @@ export async function proxy(request: NextRequest) {
       try {
         const payload = await decode({ token: cookie, secret, salt: cookieName });
         isAuthenticated = Boolean(payload?.sub);
+        isPlatformAdmin = payload?.isPlatformAdmin === true;
       } catch {
         isAuthenticated = false;
+        isPlatformAdmin = false;
       }
     }
   }
@@ -36,7 +46,28 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (isPublic && isAuthenticated && pathname !== "/dashboard") {
+  // O administrador da plataforma não acessa áreas de igreja.
+  if (isAuthenticated && isPlatformAdmin) {
+    if (
+      pathname === "/" ||
+      pathname === "/login" ||
+      pathname.startsWith("/login/") ||
+      pathname === "/dashboard" ||
+      pathname.startsWith("/dashboard/")
+    ) {
+      return NextResponse.redirect(new URL("/super-admin", request.nextUrl));
+    }
+  }
+
+  // Somente administradores da plataforma acessam o painel SaaS.
+  if (isAuthenticated && !isPlatformAdmin && pathname.startsWith("/super-admin")) {
+    return NextResponse.redirect(new URL("/dashboard", request.nextUrl));
+  }
+
+  if (
+    isAuthenticated &&
+    (pathname === "/" || pathname === "/login" || pathname.startsWith("/login/"))
+  ) {
     return NextResponse.redirect(new URL("/dashboard", request.nextUrl));
   }
 

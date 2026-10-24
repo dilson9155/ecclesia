@@ -17,7 +17,12 @@ const styles: PDF.Styles = {
     borderBottomStyle: "solid",
     paddingBottom: 10,
     marginBottom: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
   },
+  headerLogo: { width: 48, height: 48, objectFit: "contain" },
+  headerText: { flexGrow: 1 },
   churchName: { fontSize: 15, fontFamily: "Helvetica-Bold", color: "#0f172a" },
   meta: { fontSize: 8.5, color: "#64748b", marginTop: 3 },
   title: { fontSize: 13, fontFamily: "Helvetica-Bold", marginTop: 12, color: "#0f172a" },
@@ -70,6 +75,25 @@ const styles: PDF.Styles = {
     fontSize: 7.5,
     color: "#94a3b8",
   },
+  signatures: {
+    marginTop: 26,
+    flexDirection: "row",
+    justifyContent: "space-around",
+    gap: 40,
+  },
+  signatureBlock: { width: 190, alignItems: "center" },
+  signatureImage: { width: 130, height: 42, objectFit: "contain", marginBottom: 4 },
+  signatureLine: {
+    width: 190,
+    borderTopWidth: 1,
+    borderTopColor: "#64748b",
+    borderTopStyle: "solid",
+    paddingTop: 5,
+    textAlign: "center",
+    fontSize: 8.5,
+    color: "#475569",
+  },
+  signatureRole: { fontSize: 7, color: "#94a3b8", marginTop: 2, textAlign: "center" },
 };
 
 export function ReportHeader({
@@ -83,14 +107,17 @@ export function ReportHeader({
 }) {
   return (
     <PDF.View style={styles.header}>
-      <PDF.Text style={styles.churchName}>{context.churchName}</PDF.Text>
-      <PDF.Text style={styles.meta}>
-        {context.sedeName ? `${context.sedeName} · ` : ""}
-        {context.churchCnpj ? `CNPJ ${context.churchCnpj} · ` : ""}
-        Emitido em {new Intl.DateTimeFormat("pt-BR").format(new Date())}
-      </PDF.Text>
-      <PDF.Text style={styles.title}>{title}</PDF.Text>
-      {subtitle ? <PDF.Text style={styles.filters}>{subtitle}</PDF.Text> : null}
+      {context.logoUrl ? <PDF.Image src={context.logoUrl} style={styles.headerLogo} /> : null}
+      <PDF.View style={styles.headerText}>
+        <PDF.Text style={styles.churchName}>{context.churchName}</PDF.Text>
+        <PDF.Text style={styles.meta}>
+          {context.sedeName ? `${context.sedeName} · ` : ""}
+          {context.churchCnpj ? `CNPJ ${context.churchCnpj} · ` : ""}
+          Emitido em {new Intl.DateTimeFormat("pt-BR").format(new Date())}
+        </PDF.Text>
+        <PDF.Text style={styles.title}>{title}</PDF.Text>
+        {subtitle ? <PDF.Text style={styles.filters}>{subtitle}</PDF.Text> : null}
+      </PDF.View>
     </PDF.View>
   );
 }
@@ -149,6 +176,31 @@ export function PdfTable({
               {cell}
             </PDF.Text>
           ))}
+        </PDF.View>
+      ))}
+    </PDF.View>
+  );
+}
+
+export function ReportSignatures({
+  items,
+}: {
+  items: Array<{ name: string; role: string; imageUrl: string | null }>;
+}) {
+  const visible = items.filter((item) => item.name || item.imageUrl);
+  if (visible.length === 0) return null;
+
+  return (
+    <PDF.View style={styles.signatures} wrap={false}>
+      {visible.map((item) => (
+        <PDF.View key={item.role} style={styles.signatureBlock}>
+          {item.imageUrl ? (
+            <PDF.Image src={item.imageUrl} style={styles.signatureImage} />
+          ) : null}
+          <PDF.Text style={styles.signatureLine}>
+            {item.name || "________________________"}
+          </PDF.Text>
+          <PDF.Text style={styles.signatureRole}>{item.role}</PDF.Text>
         </PDF.View>
       ))}
     </PDF.View>
