@@ -44,6 +44,9 @@ prisma/*.db-journal
 # logs
 *.log
 
+# backups locais do banco
+/backups
+
 # vercel
 .vercel
 .env*
