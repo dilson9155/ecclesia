@@ -38,6 +38,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
     member: {
       name: card.member.name,
       code: card.member.code,
+      photoUrl: card.member.photoUrl,
       cpf: card.member.cpf,
       rg: card.member.rg,
       birthDate: card.member.birthDate,

@@ -6,8 +6,10 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Bell,
   Building2,
   BookText,
+  CircleDollarSign,
   CreditCard,
   FileText,
   Gift,
@@ -38,13 +40,102 @@ export type NavItem = {
   key: string;
   label: string;
   href: string;
-  icon?: "dashboard" | "igrejas" | "usuarios" | "membros" | "visitantes" | "carteirinhas" | "cartas" | "financeiro" | "contas" | "centrosCusto" | "dizimos" | "ofertas" | "fornecedores" | "entradas" | "saidas" | "livroCaixa" | "fechamento" | "relatorios" | "admin";
+  icon?: "dashboard" | "igrejas" | "usuarios" | "membros" | "visitantes" | "carteirinhas" | "cartas" | "financeiro" | "contas" | "centrosCusto" | "dizimos" | "ofertas" | "fornecedores" | "entradas" | "saidas" | "livroCaixa" | "fechamento" | "relatorios" | "cobranca" | "admin";
 };
 
 export type NavGroup = {
   title?: string;
   items: NavItem[];
 };
+
+export type AppNotice = {
+  id: string;
+  title: string;
+  message: string;
+  level: "INFO" | "ALERTA" | "URGENTE";
+  publishedAt: string;
+};
+
+const NOTICE_LEVEL_STYLES: Record<AppNotice["level"], string> = {
+  INFO: "border-sky-200 bg-sky-50 text-sky-800",
+  ALERTA: "border-amber-200 bg-amber-50 text-amber-800",
+  URGENTE: "border-red-200 bg-red-50 text-red-800",
+};
+
+const NOTICE_LEVEL_LABELS: Record<AppNotice["level"], string> = {
+  INFO: "Informativo",
+  ALERTA: "Alerta",
+  URGENTE: "Urgente",
+};
+
+function NoticeBell({ notices }: { notices: AppNotice[] }) {
+  const [open, setOpen] = useState(false);
+  if (notices.length === 0) return null;
+
+  return (
+    <div className="relative shrink-0">
+      <Button
+        type="button"
+        variant="outline"
+        size="icon"
+        aria-label={`Notificações (${notices.length})`}
+        title="Notificações da plataforma"
+        onClick={() => setOpen((value) => !value)}
+      >
+        <Bell className="h-4 w-4" />
+        <span className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
+          {notices.length > 9 ? "9+" : notices.length}
+        </span>
+      </Button>
+
+      {open && (
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setOpen(false)}
+            aria-hidden
+          />
+          <div className="absolute right-0 top-full z-50 mt-2 w-[min(24rem,calc(100vw-1.5rem))] overflow-hidden rounded-lg border bg-popover shadow-lg">
+            <div className="flex items-center justify-between border-b px-3 py-2">
+              <p className="text-sm font-semibold">Notificações</p>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-7"
+                aria-label="Fechar notificações"
+                onClick={() => setOpen(false)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="max-h-80 overflow-y-auto p-2">
+              {notices.map((notice) => (
+                <div
+                  key={notice.id}
+                  className={`mb-2 rounded-md border p-2.5 last:mb-0 ${NOTICE_LEVEL_STYLES[notice.level]}`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-semibold">{notice.title}</p>
+                    <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide">
+                      {NOTICE_LEVEL_LABELS[notice.level]}
+                    </span>
+                  </div>
+                  <p className="mt-1 whitespace-pre-line text-xs leading-relaxed">
+                    {notice.message}
+                  </p>
+                  <p className="mt-1.5 text-[10px] opacity-70">
+                    {new Date(notice.publishedAt).toLocaleDateString("pt-BR")}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 const NAV_ICONS: Record<NonNullable<NavItem["icon"]>, ReactNode> = {
   dashboard: <LayoutDashboard className="h-4 w-4" />,
@@ -65,6 +156,7 @@ const NAV_ICONS: Record<NonNullable<NavItem["icon"]>, ReactNode> = {
   livroCaixa: <BookText className="h-4 w-4" />,
   fechamento: <Lock className="h-4 w-4" />,
   relatorios: <FileText className="h-4 w-4" />,
+  cobranca: <CircleDollarSign className="h-4 w-4" />,
   admin: <Settings className="h-4 w-4" />,
 };
 
@@ -171,11 +263,13 @@ export function AppShell({
   userName,
   userEmail,
   navGroups,
+  notices = [],
   children,
 }: {
   userName: string;
   userEmail: string;
   navGroups: NavGroup[];
+  notices?: AppNotice[];
   children: ReactNode;
 }) {
   const pathname = usePathname();
@@ -230,19 +324,22 @@ export function AppShell({
               </p>
             </div>
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="shrink-0"
-            aria-label="Sair do sistema"
-            onClick={async () => {
-              await logout();
-            }}
-          >
-            <LogOut className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Sair</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            <NoticeBell notices={notices} />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="shrink-0"
+              aria-label="Sair do sistema"
+              onClick={async () => {
+                await logout();
+              }}
+            >
+              <LogOut className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Sair</span>
+            </Button>
+          </div>
         </header>
         <main className="min-w-0 p-3 sm:p-4 md:p-6">{children}</main>
       </div>

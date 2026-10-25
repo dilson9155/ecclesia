@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useForm } from "react-hook-form";
-import { Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { useForm, useWatch, type Control, type UseFormSetValue } from "react-hook-form";
+import { ImagePlus, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
 import type { FieldDef, Option, RowActionDef } from "@/modules/registration/definitions";
 import { displayField } from "@/modules/registration/validators";
 import {
@@ -53,6 +53,250 @@ type Props = {
 
 const STATUS_KEYS = ["status", "situation"];
 
+const PHOTO_MAX_FILE_BYTES = 8 * 1024 * 1024;
+const PHOTO_TARGET_PX = 480;
+const PHOTO_MAX_DATA_URL = 150_000;
+
+type DecodedImage = {
+  source: CanvasImageSource;
+  width: number;
+  height: number;
+  dispose: () => void;
+};
+
+async function decodeImage(file: File): Promise<DecodedImage> {
+  if (typeof createImageBitmap === "function") {
+    try {
+      const bitmap = await createImageBitmap(file, {
+        imageOrientation: "from-image",
+      });
+      return {
+        source: bitmap,
+        width: bitmap.width,
+        height: bitmap.height,
+        dispose: () => bitmap.close(),
+      };
+    } catch {
+      // Segue para o fallback via <img>.
+    }
+  }
+
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const element = new Image();
+      element.onload = () => resolve(element);
+      element.onerror = () =>
+        reject(new Error("Formato de imagem não suportado."));
+      element.src = objectUrl;
+    });
+    return {
+      source: image,
+      width: image.naturalWidth,
+      height: image.naturalHeight,
+      dispose: () => URL.revokeObjectURL(objectUrl),
+    };
+  } catch (error) {
+    URL.revokeObjectURL(objectUrl);
+    throw error;
+  }
+}
+
+/**
+ * Recorta a foto em um quadrado central, reduz para 480px e comprime em JPEG.
+ * O resultado costuma ficar abaixo de 100 KB, sem perda perceptível na carteirinha.
+ */
+async function optimizeMemberPhoto(file: File): Promise<string> {
+  if (!file.type.startsWith("image/")) {
+    throw new Error("Selecione um arquivo de imagem (JPG ou PNG).");
+  }
+  if (file.size > PHOTO_MAX_FILE_BYTES) {
+    throw new Error("A imagem deve ter no máximo 8 MB.");
+  }
+
+  const decoded = await decodeImage(file);
+  try {
+    const side = Math.min(decoded.width, decoded.height);
+    if (!side) throw new Error("Não foi possível ler a imagem.");
+    const size = Math.min(PHOTO_TARGET_PX, side);
+
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Não foi possível processar a imagem.");
+
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, size, size);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(
+      decoded.source,
+      (decoded.width - side) / 2,
+      (decoded.height - side) / 2,
+      side,
+      side,
+      0,
+      0,
+      size,
+      size
+    );
+
+    let quality = 0.86;
+    let dataUrl = canvas.toDataURL("image/jpeg", quality);
+    while (dataUrl.length > PHOTO_MAX_DATA_URL && quality > 0.58) {
+      quality -= 0.07;
+      dataUrl = canvas.toDataURL("image/jpeg", quality);
+    }
+    return dataUrl;
+  } finally {
+    decoded.dispose();
+  }
+}
+
+function PhotoThumb({
+  value,
+  alt,
+  className,
+}: {
+  value: unknown;
+  alt: string;
+  className?: string;
+}) {
+  if (typeof value !== "string" || !value) {
+    return (
+      <span className="flex size-8 items-center justify-center rounded-full bg-muted text-[10px] text-muted-foreground">
+        —
+      </span>
+    );
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={value}
+      alt={alt}
+      className={
+        className ??
+        "size-8 rounded-full border object-cover"
+      }
+    />
+  );
+}
+
+function PhotoField({
+  id,
+  label,
+  hint,
+  value,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  hint?: string;
+  value: unknown;
+  onChange: (value: string) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [reading, setReading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const current = typeof value === "string" ? value : "";
+
+  async function handleFile(file: File | undefined) {
+    if (!file) return;
+    setReading(true);
+    setError(null);
+    try {
+      onChange(await optimizeMemberPhoto(file));
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setReading(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  }
+
+  return (
+    <div className="space-y-1">
+      <Label htmlFor={id}>{label}</Label>
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-dashed bg-muted/30">
+          {current ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={current}
+              alt={label}
+              className="size-full object-cover"
+            />
+          ) : (
+            <ImagePlus className="size-6 text-muted-foreground" />
+          )}
+        </div>
+        <div className="space-y-1.5">
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={reading}
+              onClick={() => inputRef.current?.click()}
+            >
+              {reading ? (
+                <Loader2 className="mr-2 size-4 animate-spin" />
+              ) : (
+                <ImagePlus className="mr-2 size-4" />
+              )}
+              {current ? "Trocar foto" : "Enviar foto"}
+            </Button>
+            {current && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={reading}
+                onClick={() => onChange("")}
+              >
+                <X className="mr-2 size-4 text-destructive" />
+                Remover
+              </Button>
+            )}
+          </div>
+          {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+          {error && <p className="text-xs text-destructive">{error}</p>}
+        </div>
+      </div>
+      <input
+        ref={inputRef}
+        id={id}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        className="hidden"
+        onChange={(event) => void handleFile(event.target.files?.[0])}
+      />
+    </div>
+  );
+}
+
+function PhotoFormField({
+  field,
+  control,
+  setValue,
+}: {
+  field: FieldDef;
+  control: Control<Record<string, unknown>>;
+  setValue: UseFormSetValue<Record<string, unknown>>;
+}) {
+  const value = useWatch({ control, name: field.key });
+  return (
+    <PhotoField
+      id={field.key}
+      label={field.label}
+      hint={field.hint}
+      value={value}
+      onChange={(next) => setValue(field.key, next, { shouldDirty: true })}
+    />
+  );
+}
+
 function optionLabel(field: FieldDef, value: unknown): string | null {
   if (value === null || value === undefined || value === "") return null;
   for (const o of field.options ?? []) {
@@ -73,6 +317,7 @@ function formatValue(
   value: unknown,
   relationLabels?: Map<string, string>
 ): string {
+  if (field.type === "image") return "";
   const custom = displayField(resourceKey, field.key, value);
   if (custom !== null) return custom;
   if (field.type === "select") {
@@ -264,11 +509,18 @@ export function CrudManager({
                     >
                       <dt className="shrink-0 text-muted-foreground">{f.label}</dt>
                       <dd className="min-w-0 break-words text-right font-medium">
-                        {formatValue(
-                          resourceKey,
-                          f,
-                          row[f.key],
-                          relationLabels[f.key]
+                        {f.type === "image" ? (
+                          <PhotoThumb
+                            value={row[f.key]}
+                            alt={`Foto de ${String(row.name ?? "registro")}`}
+                          />
+                        ) : (
+                          formatValue(
+                            resourceKey,
+                            f,
+                            row[f.key],
+                            relationLabels[f.key]
+                          )
                         )}
                       </dd>
                     </div>
@@ -347,7 +599,14 @@ export function CrudManager({
                       className={f.key === "name" ? "font-medium" : undefined}
                       title={f.type === "text" ? String(row[f.key] ?? "") : undefined}
                     >
-                      {formatValue(resourceKey, f, row[f.key], relationLabels[f.key])}
+                      {f.type === "image" ? (
+                        <PhotoThumb
+                          value={row[f.key]}
+                          alt={`Foto de ${String(row.name ?? "registro")}`}
+                        />
+                      ) : (
+                        formatValue(resourceKey, f, row[f.key], relationLabels[f.key])
+                      )}
                     </TableCell>
                   ))}
                   {statusField && statusKey && (
@@ -399,6 +658,16 @@ export function CrudManager({
           <form id="crud-form" onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
             {fields.map((f) => {
               if (f.readonly) return null;
+              if (f.type === "image") {
+                return (
+                  <PhotoFormField
+                    key={f.key}
+                    field={f}
+                    control={form.control}
+                    setValue={form.setValue}
+                  />
+                );
+              }
               if (f.type === "select" || f.type === "relation") {
                 return (
                   <div key={f.key} className="space-y-1">

@@ -57,6 +57,14 @@ function formatDate(d?: Date | null): string {
   return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" }).format(d);
 }
 
+function defaultValidity(): string {
+  const date = new Date();
+  date.setFullYear(date.getFullYear() + 2);
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
 const STATUS_STYLES: Record<string, string> = {
   ATIVO: "bg-emerald-50 text-emerald-700 border-emerald-200",
   CANCELADO: "bg-destructive/10 text-destructive border-destructive/20",
@@ -92,9 +100,10 @@ export function CarteirinhasManager({ cards, members, canEmit, canCancel }: Prop
   const [memberSearch, setMemberSearch] = useState("");
   const [lastIssuedIds, setLastIssuedIds] = useState<string[]>([]);
   const [success, setSuccess] = useState<string | null>(null);
+  const [batchValidity, setBatchValidity] = useState(defaultValidity());
 
-  const form = useForm<{ memberId: string }>({
-    defaultValues: { memberId: "" },
+  const form = useForm<{ memberId: string; validityDate: string }>({
+    defaultValues: { memberId: "", validityDate: defaultValidity() },
   });
 
   const activeCards = cards.filter((card) => card.status === "ATIVO");
@@ -162,21 +171,25 @@ export function CarteirinhasManager({ cards, members, canEmit, canCancel }: Prop
     });
   }
 
-  async function handleEmit(values: { memberId: string }) {
+  async function handleEmit(values: { memberId: string; validityDate: string }) {
     if (!values.memberId) {
       setError("Selecione um membro.");
+      return;
+    }
+    if (!values.validityDate) {
+      setError("Informe a data de validade da carteirinha.");
       return;
     }
     setBusy(true);
     setError(null);
     setSuccess(null);
-    const result = await emitCard(values.memberId);
+    const result = await emitCard(values.memberId, values.validityDate);
     setBusy(false);
     if (!result.ok) {
       setError(result.error ?? "Erro ao emitir carteirinha.");
       return;
     }
-    form.reset();
+    form.reset({ memberId: "", validityDate: defaultValidity() });
     setOpen(false);
     setSuccess("Carteirinha emitida.");
     router.refresh();
@@ -188,10 +201,14 @@ export function CarteirinhasManager({ cards, members, canEmit, canCancel }: Prop
       setError("Selecione pelo menos um membro.");
       return;
     }
+    if (!batchValidity) {
+      setError("Informe a data de validade das carteirinhas.");
+      return;
+    }
     setBusy(true);
     setError(null);
     setSuccess(null);
-    const result = await emitCardsBatch(memberIds);
+    const result = await emitCardsBatch(memberIds, batchValidity);
     setBusy(false);
     if (!result.ok) {
       setError(result.error ?? "Erro ao emitir carteirinhas em lote.");
@@ -282,7 +299,7 @@ export function CarteirinhasManager({ cards, members, canEmit, canCancel }: Prop
             ? `${selectedCardList.length} carteirinha(s) selecionada(s)${
                 selectedCardList.length > 100 ? " · máximo de 100 por PDF" : ""
               }`
-            : "Selecione carteirinhas ativas para montar uma folha A4 com 10 unidades por página."}
+            : "Selecione carteirinhas ativas para montar uma folha A4 com 5 unidades por página."}
         </p>
         <Button
           asChild
@@ -486,8 +503,8 @@ export function CarteirinhasManager({ cards, members, canEmit, canCancel }: Prop
               Emitir carteirinha
             </DialogTitle>
             <DialogDescription>
-              Selecione o membro para emitir uma nova carteirinha com matrícula sequencial e QR
-              Code próprio.
+              Selecione o membro e a validade para emitir uma nova carteirinha com matrícula
+              sequencial e QR Code próprio.
             </DialogDescription>
           </DialogHeader>
           <form id="emit-card-form" onSubmit={form.handleSubmit(handleEmit)} className="space-y-4">
@@ -501,6 +518,17 @@ export function CarteirinhasManager({ cards, members, canEmit, canCancel }: Prop
                   </option>
                 ))}
               </select>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="validityDate">Válida até *</Label>
+              <Input
+                id="validityDate"
+                type="date"
+                {...form.register("validityDate")}
+              />
+              <p className="text-xs text-muted-foreground">
+                A data aparece impressa na frente da carteirinha.
+              </p>
             </div>
           </form>
           <DialogFooter>
@@ -523,12 +551,24 @@ export function CarteirinhasManager({ cards, members, canEmit, canCancel }: Prop
               Emitir carteirinhas em lote
             </DialogTitle>
             <DialogDescription>
-              Selecione os membros ativos. Em seguida você poderá gerar uma folha A4 com até 10
+              Selecione os membros ativos. Em seguida você poderá gerar uma folha A4 com até 5
               carteirinhas por página.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-3">
+            <div className="space-y-1">
+              <Label htmlFor="batch-validity">Válida até *</Label>
+              <Input
+                id="batch-validity"
+                type="date"
+                value={batchValidity}
+                onChange={(event) => setBatchValidity(event.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                A mesma validade é aplicada a todas as carteirinhas do lote.
+              </p>
+            </div>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input

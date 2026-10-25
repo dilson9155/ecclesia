@@ -10,7 +10,7 @@ import {
   type MemberCardPdfData,
 } from "@/components/carteirinhas/member-card-pdf";
 
-const CARDS_PER_PAGE = 10;
+const CARDS_PER_PAGE = 5;
 const CARDS_PER_ROW = 2;
 
 export async function GET(request: Request) {
@@ -57,6 +57,7 @@ export async function GET(request: Request) {
         member: {
           name: card.member.name,
           code: card.member.code,
+          photoUrl: card.member.photoUrl,
           cpf: card.member.cpf,
           rg: card.member.rg,
           birthDate: card.member.birthDate,
@@ -94,11 +95,11 @@ export async function GET(request: Request) {
   for (let offset = 0; offset < data.length; offset += CARDS_PER_PAGE) {
     const group = data.slice(offset, offset + CARDS_PER_PAGE);
     const rows = [];
-    for (let rowIndex = 0; rowIndex < CARDS_PER_ROW * 5; rowIndex += CARDS_PER_ROW) {
+    for (let rowIndex = 0; rowIndex < CARDS_PER_PAGE; rowIndex += CARDS_PER_ROW) {
       const rowCards = group.slice(rowIndex, rowIndex + CARDS_PER_ROW);
       if (rowCards.length === 0) break;
       rows.push(
-        <PDF.View key={`row-${rowIndex}`} style={{ flexDirection: "row", gap: 8.5 }}>
+        <PDF.View key={`row-${rowIndex}`} style={{ flexDirection: "row", gap: 9 }}>
           {rowCards.map((card) => (
             <MemberCardFront key={card.id} data={card} />
           ))}
@@ -116,7 +117,8 @@ export async function GET(request: Request) {
           paddingHorizontal: 17,
           flexDirection: "column",
           alignItems: "center",
-          gap: 8.5,
+          justifyContent: "center",
+          gap: 9,
         }}
       >
         {rows}

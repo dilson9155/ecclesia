@@ -84,6 +84,7 @@ enum OfferingType {
 
 enum ExpenseStatus {
   PENDENTE
+  PARCIAL
   PAGO
   CANCELADO
 }
@@ -151,28 +152,28 @@ enum SupplierKeyType {
 }
 
 model Church {
-  id          String         @id @default(cuid())
+  id          String        @id @default(cuid())
   name        String
   legalName   String?
-  cnpj        String?        @unique
+  cnpj        String?       @unique
   logoUrl     String?
   description String?
   phone       String?
   email       String?
-  status      GenericStatus  @default(ATIVO)
+  status      GenericStatus @default(ATIVO)
 
   /// Estrutura contratada: apenas a sede ou sede + congregações.
-  structureType ChurchStructureType @default(SEDE_AND_CONGREGATIONS)
+  structureType           ChurchStructureType @default(SEDE_AND_CONGREGATIONS)
   /// Membros informados da sede (usado para o cálculo do plano).
-  sedeMemberCount Int @default(0)
+  sedeMemberCount         Int                 @default(0)
   /// Membros informados somando as congregações (usado para o cálculo do plano).
-  congregationMemberCount Int @default(0)
+  congregationMemberCount Int                 @default(0)
   /// Total de membros (sede + congregações) usado para o cálculo do plano.
-  memberCount Int @default(0)
-  notes       String?        @db.Text
+  memberCount             Int                 @default(0)
+  notes                   String?             @db.Text
 
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   subscription    Subscription?
   sedes           Sede[]
@@ -184,6 +185,7 @@ model Church {
   offerings       Offering[]
   incomes         Income[]
   expenses        Expense[]
+  expensePayments ExpensePayment[]
   suppliers       Supplier[]
   accounts        Account[]
   costCenters     CostCenter[]
@@ -192,6 +194,7 @@ model Church {
   documents       Document[]
   templates       LetterTemplate[]
   closings        FinancialClosing[]
+  charges         ChurchCharge[]
   auditLogs       AuditLog[]
   systemSettings  SystemSetting[]
 
@@ -199,23 +202,25 @@ model Church {
 }
 
 model Plan {
-  id          String              @id @default(cuid())
-  code        String              @unique
-  name        String
-  description String?
-  structureType PlanStructureType
-  minMembers  Int                 @default(0)
-  maxMembers  Int?
-  price       Decimal             @db.Decimal(12, 2)
-  trialDays   Int                 @default(14)
-  maxSedes    Int?
+  id               String            @id @default(cuid())
+  code             String            @unique
+  name             String
+  description      String?
+  structureType    PlanStructureType
+  minMembers       Int               @default(0)
+  maxMembers       Int?
+  price            Decimal           @db.Decimal(12, 2)
+  trialDays        Int               @default(14)
+  maxSedes         Int?
   maxCongregations Int?
-  features    Json                @default("[]")
-  active      Boolean             @default(true)
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
+  features         Json              @default("[]")
+  active           Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 
   subscriptions Subscription[]
+
+  charges ChurchCharge[]
 
   @@index([structureType, active])
   @@index([minMembers, maxMembers])
@@ -244,9 +249,9 @@ model Subscription {
 }
 
 model Sede {
-  id        String         @id @default(cuid())
+  id        String        @id @default(cuid())
   churchId  String
-  church    Church         @relation(fields: [churchId], references: [id], onDelete: Restrict)
+  church    Church        @relation(fields: [churchId], references: [id], onDelete: Restrict)
   name      String
   cnpj      String?
   logoUrl   String?
@@ -257,9 +262,9 @@ model Sede {
   state     String?
   phone     String?
   email     String?
-  status    GenericStatus  @default(ATIVO)
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
+  status    GenericStatus @default(ATIVO)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
 
   congregations Congregation[]
   members       Member[]
@@ -270,11 +275,11 @@ model Sede {
 }
 
 model Congregation {
-  id        String         @id @default(cuid())
+  id        String        @id @default(cuid())
   churchId  String
-  church    Church         @relation(fields: [churchId], references: [id], onDelete: Restrict)
+  church    Church        @relation(fields: [churchId], references: [id], onDelete: Restrict)
   sedeId    String
-  sede      Sede           @relation(fields: [sedeId], references: [id], onDelete: Restrict)
+  sede      Sede          @relation(fields: [sedeId], references: [id], onDelete: Restrict)
   code      String
   name      String
   address   String?
@@ -285,9 +290,9 @@ model Congregation {
   phone     String?
   email     String?
   imageUrl  String?
-  status    GenericStatus  @default(ATIVO)
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
+  status    GenericStatus @default(ATIVO)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
 
   members         Member[]
   visitors        Visitor[]
@@ -295,6 +300,7 @@ model Congregation {
   offerings       Offering[]
   incomes         Income[]
   expenses        Expense[]
+  expensePayments ExpensePayment[]
   cashEntries     CashEntry[]
   costCenters     CostCenter[]
   cards           MembershipCard[]
@@ -309,37 +315,39 @@ model Congregation {
 }
 
 model User {
-  id             String    @id @default(cuid())
-  churchId       String?
-  church         Church?   @relation(fields: [churchId], references: [id], onDelete: SetNull)
-  sedeId         String?
-  sede           Sede?     @relation(fields: [sedeId], references: [id], onDelete: SetNull)
-  congregationId String?
-  congregation   Congregation? @relation(fields: [congregationId], references: [id], onDelete: SetNull)
-  name           String
-  email          String    @unique
-  passwordHash   String
-  active         Boolean   @default(true)
+  id              String        @id @default(cuid())
+  churchId        String?
+  church          Church?       @relation(fields: [churchId], references: [id], onDelete: SetNull)
+  sedeId          String?
+  sede            Sede?         @relation(fields: [sedeId], references: [id], onDelete: SetNull)
+  congregationId  String?
+  congregation    Congregation? @relation(fields: [congregationId], references: [id], onDelete: SetNull)
+  name            String
+  email           String        @unique
+  passwordHash    String
+  active          Boolean       @default(true)
   /// Administrador da plataforma (Super Admin do SaaS), independente da igreja.
-  isPlatformAdmin Boolean  @default(false)
-  lastLoginAt    DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  isPlatformAdmin Boolean       @default(false)
+  lastLoginAt     DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
-  roles       UserRole[]
-  auditLogs   AuditLog[]
-  passwordResetTokens PasswordResetToken[]
-  tithes      Tithe[]
-  offerings   Offering[]
-  incomes     Income[]
-  expenses    Expense[]
-  expensePaid Expense[]   @relation("ExpensePaidBy")
-  expenseCancelled Expense[] @relation("ExpenseCancelledBy")
-  cashEntries CashEntry[]
-  cards       MembershipCard[]
-  documents   Document[]
-  closingsClosed   FinancialClosing[] @relation("ClosingClosedBy")
-  closingsReopened FinancialClosing[] @relation("ClosingReopenedBy")
+  roles                   UserRole[]
+  auditLogs               AuditLog[]
+  passwordResetTokens     PasswordResetToken[]
+  tithes                  Tithe[]
+  offerings               Offering[]
+  incomes                 Income[]
+  expenses                Expense[]
+  expensePaid             Expense[]            @relation("ExpensePaidBy")
+  expenseCancelled        Expense[]            @relation("ExpenseCancelledBy")
+  expensePaymentsCreated  ExpensePayment[]     @relation("ExpensePaymentCreatedBy")
+  expensePaymentsReversed ExpensePayment[]     @relation("ExpensePaymentReversedBy")
+  cashEntries             CashEntry[]
+  cards                   MembershipCard[]
+  documents               Document[]
+  closingsClosed          FinancialClosing[]   @relation("ClosingClosedBy")
+  closingsReopened        FinancialClosing[]   @relation("ClosingReopenedBy")
 
   @@index([churchId])
   @@index([sedeId])
@@ -348,15 +356,15 @@ model User {
 }
 
 model PasswordResetToken {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   /// Hash SHA-256 do token enviado por e-mail. O token original nunca é armazenado.
-  tokenHash   String   @unique
+  tokenHash   String    @unique
   expiresAt   DateTime
   usedAt      DateTime?
   requestedIp String?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
 
   @@index([userId, createdAt])
   @@index([expiresAt])
@@ -364,12 +372,12 @@ model PasswordResetToken {
 }
 
 model Role {
-  id          String        @id @default(cuid())
-  name        UserRoleName  @unique
+  id          String       @id @default(cuid())
+  name        UserRoleName @unique
   description String?
-  system      Boolean       @default(false)
-  active      Boolean       @default(true)
-  createdAt   DateTime      @default(now())
+  system      Boolean      @default(false)
+  active      Boolean      @default(true)
+  createdAt   DateTime     @default(now())
 
   permissions RolePermission[]
   users       UserRole[]
@@ -378,8 +386,8 @@ model Role {
 }
 
 model Permission {
-  id          String  @id @default(cuid())
-  key         String  @unique
+  id          String   @id @default(cuid())
+  key         String   @unique
   name        String
   group       String?
   description String?
@@ -414,45 +422,45 @@ model UserRole {
 }
 
 model Member {
-  id           String       @id @default(cuid())
-  churchId     String
-  church       Church       @relation(fields: [churchId], references: [id], onDelete: Restrict)
-  sedeId       String
-  sede         Sede         @relation(fields: [sedeId], references: [id], onDelete: Restrict)
+  id             String         @id @default(cuid())
+  churchId       String
+  church         Church         @relation(fields: [churchId], references: [id], onDelete: Restrict)
+  sedeId         String
+  sede           Sede           @relation(fields: [sedeId], references: [id], onDelete: Restrict)
   congregationId String
-  congregation Congregation @relation(fields: [congregationId], references: [id], onDelete: Restrict)
-  code         String
-  name         String
-  photoUrl     String?
-  cpf          String?      @unique
-  rg           String?
-  birthDate    DateTime?
-  gender       Gender?
-  maritalStatus MaritalStatus?
-  phone        String?
-  whatsapp     String?
-  email        String?
-  address      String?
-  cep          String?
-  district     String?
-  city         String?
-  state        String?
-  conversionDate  DateTime?
-  baptismDate     DateTime?
-  receptionDate   DateTime?
-  cargo        String?
-  ministerio   String?
-  departamento String?
-  situation    MemberStatus @default(ATIVO)
-  observations String?
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  congregation   Congregation   @relation(fields: [congregationId], references: [id], onDelete: Restrict)
+  code           String
+  name           String
+  photoUrl       String?
+  cpf            String?        @unique
+  rg             String?
+  birthDate      DateTime?
+  gender         Gender?
+  maritalStatus  MaritalStatus?
+  phone          String?
+  whatsapp       String?
+  email          String?
+  address        String?
+  cep            String?
+  district       String?
+  city           String?
+  state          String?
+  conversionDate DateTime?
+  baptismDate    DateTime?
+  receptionDate  DateTime?
+  cargo          String?
+  ministerio     String?
+  departamento   String?
+  situation      MemberStatus   @default(ATIVO)
+  observations   String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
-  tithes      Tithe[]
-  offerings   Offering[]
-  cards       MembershipCard[]
-  documents   Document[]
-  visitor     Visitor[]
+  tithes    Tithe[]
+  offerings Offering[]
+  cards     MembershipCard[]
+  documents Document[]
+  visitor   Visitor[]
 
   @@unique([congregationId, code])
   @@index([churchId, situation])
@@ -461,20 +469,20 @@ model Member {
 }
 
 model Visitor {
-  id          String    @id @default(cuid())
-  churchId    String
-  church      Church    @relation(fields: [churchId], references: [id], onDelete: Restrict)
+  id             String       @id @default(cuid())
+  churchId       String
+  church         Church       @relation(fields: [churchId], references: [id], onDelete: Restrict)
   congregationId String
-  congregation Congregation @relation(fields: [congregationId], references: [id], onDelete: Restrict)
-  name        String
-  phone       String?
-  whatsapp    String?
-  email       String?
-  visitDate   DateTime?
-  observations String?
-  createdById String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  congregation   Congregation @relation(fields: [congregationId], references: [id], onDelete: Restrict)
+  name           String
+  phone          String?
+  whatsapp       String?
+  email          String?
+  visitDate      DateTime?
+  observations   String?
+  createdById    String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   convertedToMemberId String? @unique
   convertedToMember   Member? @relation(fields: [convertedToMemberId], references: [id], onDelete: SetNull)
@@ -484,27 +492,27 @@ model Visitor {
 }
 
 model Tithe {
-  id            String        @id @default(cuid())
-  churchId      String
-  church        Church        @relation(fields: [churchId], references: [id], onDelete: Restrict)
+  id             String        @id @default(cuid())
+  churchId       String
+  church         Church        @relation(fields: [churchId], references: [id], onDelete: Restrict)
   congregationId String
-  congregation  Congregation  @relation(fields: [congregationId], references: [id], onDelete: Restrict)
-  memberId      String?
-  member        Member?       @relation(fields: [memberId], references: [id], onDelete: SetNull)
-  date          DateTime
-  value         Decimal       @db.Decimal(12, 2)
-  paymentMethod PaymentMethod @default(DINHEIRO)
-  costCenterId  String?
-  costCenter    CostCenter?   @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
-  accountId     String
-  account       Account       @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  congregation   Congregation  @relation(fields: [congregationId], references: [id], onDelete: Restrict)
+  memberId       String?
+  member         Member?       @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  date           DateTime
+  value          Decimal       @db.Decimal(12, 2)
+  paymentMethod  PaymentMethod @default(DINHEIRO)
+  costCenterId   String?
+  costCenter     CostCenter?   @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
+  accountId      String
+  account        Account       @relation(fields: [accountId], references: [id], onDelete: Restrict)
   accountingCode String
-  observation   String?
-  isAnonymous   Boolean       @default(false)
+  observation    String?
+  isAnonymous    Boolean       @default(false)
   registeredById String?
-  registeredBy  User?         @relation(fields: [registeredById], references: [id], onDelete: SetNull)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  registeredBy   User?         @relation(fields: [registeredById], references: [id], onDelete: SetNull)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
   @@index([congregationId, date])
   @@index([memberId, date])
@@ -513,29 +521,29 @@ model Tithe {
 }
 
 model Offering {
-  id            String        @id @default(cuid())
-  churchId      String
-  church        Church        @relation(fields: [churchId], references: [id], onDelete: Restrict)
+  id             String        @id @default(cuid())
+  churchId       String
+  church         Church        @relation(fields: [churchId], references: [id], onDelete: Restrict)
   congregationId String
-  congregation  Congregation  @relation(fields: [congregationId], references: [id], onDelete: Restrict)
-  memberId      String?
-  member        Member?       @relation(fields: [memberId], references: [id], onDelete: SetNull)
-  contributor   String?
-  type          OfferingType  @default(CULTO)
-  date          DateTime
-  value         Decimal       @db.Decimal(12, 2)
-  paymentMethod PaymentMethod @default(DINHEIRO)
-  costCenterId  String?
-  costCenter    CostCenter?   @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
-  accountId     String
-  account       Account       @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  congregation   Congregation  @relation(fields: [congregationId], references: [id], onDelete: Restrict)
+  memberId       String?
+  member         Member?       @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  contributor    String?
+  type           OfferingType  @default(CULTO)
+  date           DateTime
+  value          Decimal       @db.Decimal(12, 2)
+  paymentMethod  PaymentMethod @default(DINHEIRO)
+  costCenterId   String?
+  costCenter     CostCenter?   @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
+  accountId      String
+  account        Account       @relation(fields: [accountId], references: [id], onDelete: Restrict)
   accountingCode String
-  observation   String?
-  isAnonymous   Boolean       @default(false)
+  observation    String?
+  isAnonymous    Boolean       @default(false)
   registeredById String?
-  registeredBy  User?         @relation(fields: [registeredById], references: [id], onDelete: SetNull)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  registeredBy   User?         @relation(fields: [registeredById], references: [id], onDelete: SetNull)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
   @@index([congregationId, date])
   @@index([memberId, date])
@@ -545,28 +553,28 @@ model Offering {
 }
 
 model Income {
-  id            String        @id @default(cuid())
-  code          String
-  churchId      String
-  church        Church        @relation(fields: [churchId], references: [id], onDelete: Restrict)
+  id             String        @id @default(cuid())
+  code           String
+  churchId       String
+  church         Church        @relation(fields: [churchId], references: [id], onDelete: Restrict)
   congregationId String
-  congregation  Congregation  @relation(fields: [congregationId], references: [id], onDelete: Restrict)
-  date          DateTime
-  description   String
-  value         Decimal       @db.Decimal(12, 2)
-  paymentMethod PaymentMethod @default(DINHEIRO)
-  document      String?
-  costCenterId  String?
-  costCenter    CostCenter?   @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
-  accountId     String
-  account       Account       @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  congregation   Congregation  @relation(fields: [congregationId], references: [id], onDelete: Restrict)
+  date           DateTime
+  description    String
+  value          Decimal       @db.Decimal(12, 2)
+  paymentMethod  PaymentMethod @default(DINHEIRO)
+  document       String?
+  costCenterId   String?
+  costCenter     CostCenter?   @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
+  accountId      String
+  account        Account       @relation(fields: [accountId], references: [id], onDelete: Restrict)
   accountingCode String
-  responsible   String?
-  observation   String?
+  responsible    String?
+  observation    String?
   registeredById String?
-  registeredBy  User?         @relation(fields: [registeredById], references: [id], onDelete: SetNull)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  registeredBy   User?         @relation(fields: [registeredById], references: [id], onDelete: SetNull)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
   @@unique([congregationId, code])
   @@index([churchId, date])
@@ -576,47 +584,81 @@ model Income {
 }
 
 model Expense {
-  id            String        @id @default(cuid())
-  code          String
-  churchId      String
-  church        Church        @relation(fields: [churchId], references: [id], onDelete: Restrict)
-  congregationId String
-  congregation  Congregation  @relation(fields: [congregationId], references: [id], onDelete: Restrict)
-  date          DateTime
-  dueDate       DateTime?
-  paymentDate   DateTime?
-  supplierId    String?
-  supplier      Supplier?     @relation(fields: [supplierId], references: [id], onDelete: SetNull)
-  beneficiary   String?
-  description   String
-  value         Decimal       @db.Decimal(12, 2)
-  paymentMethod PaymentMethod @default(DINHEIRO)
-  document      String?
-  costCenterId  String?
-  costCenter    CostCenter?   @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
-  accountId     String
-  account       Account       @relation(fields: [accountId], references: [id], onDelete: Restrict)
-  accountingCode String
-  status        ExpenseStatus @default(PENDENTE)
-  observation   String?
-  attachments   Json?
-  paidAt        DateTime?
-  paidById      String?
-  paidBy        User?         @relation("ExpensePaidBy", fields: [paidById], references: [id], onDelete: SetNull)
-  cancelledAt   DateTime?
-  cancelledById String?
-  cancelledBy   User?         @relation("ExpenseCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
-  registeredById String?
-  registeredBy  User?         @relation(fields: [registeredById], references: [id], onDelete: SetNull)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  id                 String        @id @default(cuid())
+  code               String
+  churchId           String
+  church             Church        @relation(fields: [churchId], references: [id], onDelete: Restrict)
+  congregationId     String
+  congregation       Congregation  @relation(fields: [congregationId], references: [id], onDelete: Restrict)
+  date               DateTime
+  dueDate            DateTime?
+  paymentDate        DateTime?
+  supplierId         String?
+  supplier           Supplier?     @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  beneficiary        String?
+  description        String
+  value              Decimal       @db.Decimal(12, 2)
+  paymentMethod      PaymentMethod @default(DINHEIRO)
+  document           String?
+  costCenterId       String?
+  costCenter         CostCenter?   @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
+  accountId          String
+  account            Account       @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  accountingCode     String
+  status             ExpenseStatus @default(PENDENTE)
+  observation        String?
+  attachments        Json?
+  paidAt             DateTime?
+  paidById           String?
+  paidBy             User?         @relation("ExpensePaidBy", fields: [paidById], references: [id], onDelete: SetNull)
+  cancelledAt        DateTime?
+  cancelledById      String?
+  cancelledBy        User?         @relation("ExpenseCancelledBy", fields: [cancelledById], references: [id], onDelete: SetNull)
+  registeredById     String?
+  registeredBy       User?         @relation(fields: [registeredById], references: [id], onDelete: SetNull)
+  installmentGroupId String?
+  installmentNumber  Int?
+  installmentTotal   Int?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  payments ExpensePayment[]
 
   @@unique([congregationId, code])
   @@index([churchId, date])
   @@index([congregationId, date])
   @@index([status])
   @@index([accountId, date])
+  @@index([installmentGroupId])
   @@map("expenses")
+}
+
+model ExpensePayment {
+  id             String        @id @default(cuid())
+  churchId       String
+  church         Church        @relation(fields: [churchId], references: [id], onDelete: Restrict)
+  congregationId String
+  congregation   Congregation  @relation(fields: [congregationId], references: [id], onDelete: Restrict)
+  expenseId      String
+  expense        Expense       @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  date           DateTime
+  value          Decimal       @db.Decimal(12, 2)
+  paymentMethod  PaymentMethod @default(DINHEIRO)
+  document       String?
+  notes          String?
+  cashEntryId    String?
+  createdById    String?
+  createdBy      User?         @relation("ExpensePaymentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  reversedAt     DateTime?
+  reversedById   String?
+  reversedBy     User?         @relation("ExpensePaymentReversedBy", fields: [reversedById], references: [id], onDelete: SetNull)
+  reversalReason String?
+  createdAt      DateTime      @default(now())
+
+  @@index([expenseId])
+  @@index([churchId, date])
+  @@index([congregationId, date])
+  @@map("expense_payments")
 }
 
 model Supplier {
@@ -642,21 +684,21 @@ model Supplier {
 }
 
 model Account {
-  id            String        @id @default(cuid())
-  churchId      String
-  church        Church        @relation(fields: [churchId], references: [id], onDelete: Restrict)
-  code          String
-  name          String
-  nature        AccountNature
-  parentId      String?
-  parent        Account?      @relation("AccountTree", fields: [parentId], references: [id], onDelete: Restrict)
-  children      Account[]     @relation("AccountTree")
-  level         Int           @default(1)
+  id             String        @id @default(cuid())
+  churchId       String
+  church         Church        @relation(fields: [churchId], references: [id], onDelete: Restrict)
+  code           String
+  name           String
+  nature         AccountNature
+  parentId       String?
+  parent         Account?      @relation("AccountTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children       Account[]     @relation("AccountTree")
+  level          Int           @default(1)
   accountingCode String
-  description   String?
-  status        GenericStatus @default(ATIVO)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  description    String?
+  status         GenericStatus @default(ATIVO)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
   tithes      Tithe[]
   offerings   Offering[]
@@ -670,22 +712,22 @@ model Account {
 }
 
 model CostCenter {
-  id          String         @id @default(cuid())
-  churchId    String
-  church      Church         @relation(fields: [churchId], references: [id], onDelete: Restrict)
-  code        String
-  name        String
-  description String?
+  id             String        @id @default(cuid())
+  churchId       String
+  church         Church        @relation(fields: [churchId], references: [id], onDelete: Restrict)
+  code           String
+  name           String
+  description    String?
   congregationId String?
-  congregation Congregation? @relation(fields: [congregationId], references: [id], onDelete: SetNull)
-  status      GenericStatus  @default(ATIVO)
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  congregation   Congregation? @relation(fields: [congregationId], references: [id], onDelete: SetNull)
+  status         GenericStatus @default(ATIVO)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
-  tithes    Tithe[]
-  offerings Offering[]
-  incomes   Income[]
-  expenses  Expense[]
+  tithes      Tithe[]
+  offerings   Offering[]
+  incomes     Income[]
+  expenses    Expense[]
   cashEntries CashEntry[]
 
   @@unique([churchId, code])
@@ -694,26 +736,26 @@ model CostCenter {
 }
 
 model CashEntry {
-  id          String       @id @default(cuid())
-  churchId    String
-  church      Church       @relation(fields: [churchId], references: [id], onDelete: Restrict)
+  id             String       @id @default(cuid())
+  churchId       String
+  church         Church       @relation(fields: [churchId], references: [id], onDelete: Restrict)
   congregationId String
-  congregation Congregation @relation(fields: [congregationId], references: [id], onDelete: Restrict)
-  date        DateTime
-  document    String?
-  description String
-  nature      EntryNature
-  value       Decimal      @db.Decimal(12, 2)
-  accountId   String
-  account     Account      @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  congregation   Congregation @relation(fields: [congregationId], references: [id], onDelete: Restrict)
+  date           DateTime
+  document       String?
+  description    String
+  nature         EntryNature
+  value          Decimal      @db.Decimal(12, 2)
+  accountId      String
+  account        Account      @relation(fields: [accountId], references: [id], onDelete: Restrict)
   accountingCode String
-  costCenterId String?
-  costCenter  CostCenter?  @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
-  sourceType  LedgerSource
-  sourceId    String?
-  createdById String?
-  createdBy   User?        @relation(fields: [createdById], references: [id], onDelete: SetNull)
-  createdAt   DateTime     @default(now())
+  costCenterId   String?
+  costCenter     CostCenter?  @relation(fields: [costCenterId], references: [id], onDelete: Restrict)
+  sourceType     LedgerSource
+  sourceId       String?
+  createdById    String?
+  createdBy      User?        @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt      DateTime     @default(now())
 
   @@index([congregationId, date])
   @@index([congregationId, accountId, date])
@@ -723,26 +765,26 @@ model CashEntry {
 }
 
 model FinancialClosing {
-  id          String         @id @default(cuid())
-  churchId    String
-  church      Church         @relation(fields: [churchId], references: [id], onDelete: Restrict)
+  id             String        @id @default(cuid())
+  churchId       String
+  church         Church        @relation(fields: [churchId], references: [id], onDelete: Restrict)
   congregationId String
-  congregation Congregation  @relation(fields: [congregationId], references: [id], onDelete: Restrict)
-  year        Int
-  month       Int
-  status      ClosingStatus  @default(ABERTO)
-  revenue     Decimal?       @db.Decimal(14, 2)
-  expense     Decimal?       @db.Decimal(14, 2)
-  balance     Decimal?       @db.Decimal(14, 2)
-  closedAt    DateTime?
-  closedById  String?
-  closedBy    User?          @relation("ClosingClosedBy", fields: [closedById], references: [id], onDelete: SetNull)
-  reopenedAt  DateTime?
-  reopenedById String?
-  reopenedBy  User?          @relation("ClosingReopenedBy", fields: [reopenedById], references: [id], onDelete: SetNull)
-  observations String?
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  congregation   Congregation  @relation(fields: [congregationId], references: [id], onDelete: Restrict)
+  year           Int
+  month          Int
+  status         ClosingStatus @default(ABERTO)
+  revenue        Decimal?      @db.Decimal(14, 2)
+  expense        Decimal?      @db.Decimal(14, 2)
+  balance        Decimal?      @db.Decimal(14, 2)
+  closedAt       DateTime?
+  closedById     String?
+  closedBy       User?         @relation("ClosingClosedBy", fields: [closedById], references: [id], onDelete: SetNull)
+  reopenedAt     DateTime?
+  reopenedById   String?
+  reopenedBy     User?         @relation("ClosingReopenedBy", fields: [reopenedById], references: [id], onDelete: SetNull)
+  observations   String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
   @@unique([congregationId, year, month])
   @@index([churchId, year, month])
@@ -750,22 +792,22 @@ model FinancialClosing {
 }
 
 model MembershipCard {
-  id          String      @id @default(cuid())
-  churchId    String
-  church      Church      @relation(fields: [churchId], references: [id], onDelete: Restrict)
+  id             String       @id @default(cuid())
+  churchId       String
+  church         Church       @relation(fields: [churchId], references: [id], onDelete: Restrict)
   congregationId String
-  congregation Congregation @relation(fields: [congregationId], references: [id], onDelete: Restrict)
-  memberId    String
-  member      Member      @relation(fields: [memberId], references: [id], onDelete: Restrict)
-  cardNumber  String?
-  issueDate   DateTime    @default(now())
-  validityDate DateTime?
-  status      CardStatus  @default(ATIVO)
-  qrToken     String?     @unique
-  signatureUrl String?
-  createdById String?
-  createdBy   User?       @relation(fields: [createdById], references: [id], onDelete: SetNull)
-  createdAt   DateTime    @default(now())
+  congregation   Congregation @relation(fields: [congregationId], references: [id], onDelete: Restrict)
+  memberId       String
+  member         Member       @relation(fields: [memberId], references: [id], onDelete: Restrict)
+  cardNumber     String?
+  issueDate      DateTime     @default(now())
+  validityDate   DateTime?
+  status         CardStatus   @default(ATIVO)
+  qrToken        String?      @unique
+  signatureUrl   String?
+  createdById    String?
+  createdBy      User?        @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt      DateTime     @default(now())
 
   @@index([congregationId])
   @@index([memberId])
@@ -790,24 +832,24 @@ model LetterTemplate {
 }
 
 model Document {
-  id          String       @id @default(cuid())
-  churchId    String
-  church      Church       @relation(fields: [churchId], references: [id], onDelete: Restrict)
+  id             String          @id @default(cuid())
+  churchId       String
+  church         Church          @relation(fields: [churchId], references: [id], onDelete: Restrict)
   congregationId String?
-  congregation Congregation? @relation(fields: [congregationId], references: [id], onDelete: SetNull)
-  memberId    String?
-  member      Member?      @relation(fields: [memberId], references: [id], onDelete: SetNull)
-  type        DocumentType
-  templateId  String?
-  template    LetterTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
-  protocol    String?
-  title       String
-  content     String
-  signatureName String?
-  issueDate   DateTime     @default(now())
-  createdById String?
-  createdBy   User?        @relation(fields: [createdById], references: [id], onDelete: SetNull)
-  createdAt   DateTime     @default(now())
+  congregation   Congregation?   @relation(fields: [congregationId], references: [id], onDelete: SetNull)
+  memberId       String?
+  member         Member?         @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  type           DocumentType
+  templateId     String?
+  template       LetterTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  protocol       String?
+  title          String
+  content        String
+  signatureName  String?
+  issueDate      DateTime        @default(now())
+  createdById    String?
+  createdBy      User?           @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt      DateTime        @default(now())
 
   @@index([churchId, type])
   @@index([memberId])
@@ -815,20 +857,20 @@ model Document {
 }
 
 model AuditLog {
-  id        String       @id @default(cuid())
-  churchId  String?
-  church    Church?      @relation(fields: [churchId], references: [id], onDelete: SetNull)
-  userId    String?
-  user      User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
-  action    AuditAction
-  module    String
-  entity    String?
-  entityId  String?
+  id          String      @id @default(cuid())
+  churchId    String?
+  church      Church?     @relation(fields: [churchId], references: [id], onDelete: SetNull)
+  userId      String?
+  user        User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action      AuditAction
+  module      String
+  entity      String?
+  entityId    String?
   description String?
-  oldValues Json?
-  newValues Json?
-  ip        String?
-  createdAt DateTime     @default(now())
+  oldValues   Json?
+  newValues   Json?
+  ip          String?
+  createdAt   DateTime    @default(now())
 
   @@index([churchId, createdAt])
   @@index([entity, entityId])
@@ -848,4 +890,58 @@ model SystemSetting {
 
   @@unique([churchId, key])
   @@map("system_settings")
+}
+
+enum ChargeStatus {
+  PENDENTE
+  PAGA
+  VENCIDA
+  CANCELADA
+}
+
+/// Cobrança da plataforma para uma igreja (sede). Configurada no painel admin.
+model ChurchCharge {
+  id             String       @id @default(cuid())
+  churchId       String
+  church         Church       @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  planId         String?
+  plan           Plan?        @relation(fields: [planId], references: [id], onDelete: SetNull)
+  description    String
+  /// Mês de referência no formato AAAA-MM.
+  referenceMonth String
+  amount         Decimal      @db.Decimal(12, 2)
+  dueDate        DateTime
+  status         ChargeStatus @default(PENDENTE)
+  paidAt         DateTime?
+  notes          String?      @db.Text
+  createdById    String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([churchId, referenceMonth])
+  @@index([status, dueDate])
+  @@map("church_charges")
+}
+
+enum NoticeLevel {
+  INFO
+  ALERTA
+  URGENTE
+}
+
+/// Comunicado global publicado pelo painel admin e exibido em todas as igrejas.
+model PlatformNotice {
+  id          String      @id @default(cuid())
+  title       String
+  message     String      @db.Text
+  level       NoticeLevel @default(INFO)
+  active      Boolean     @default(true)
+  publishedAt DateTime    @default(now())
+  expiresAt   DateTime?
+  createdById String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([active, publishedAt])
+  @@map("platform_notices")
 }

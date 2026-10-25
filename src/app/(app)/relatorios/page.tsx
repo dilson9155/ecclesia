@@ -1,4 +1,4 @@
-import { FileText, LineChart, Users } from "lucide-react";
+import { ClipboardList, FileText, LineChart, Users } from "lucide-react";
 import Link from "next/link";
 import { requirePermission } from "@/lib/rbac";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,6 +23,13 @@ const REPORTS = [
     title: "Contribuições",
     description: "Dízimos e ofertas por período, com totais por tipo e por membro.",
     icon: FileText,
+  },
+  {
+    href: "/relatorios/lista-presenca",
+    title: "Lista de Presença",
+    description:
+      "Lista de presença por congregação, com assunto, data, nome, rol, CPF e espaço para assinatura.",
+    icon: ClipboardList,
   },
 ];
 

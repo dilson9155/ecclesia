@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { requireAuth } from "@/lib/rbac";
+import { listActiveNotices } from "@/services/notices.service";
 import { AppShell, type NavItem, type NavGroup } from "@/components/app-shell";
 
 type NavEntry = NavItem & { permission?: string };
@@ -25,7 +26,7 @@ const NAV_GROUPS: Array<{ title?: string; items: NavEntry[] }> = [
       { key: "dizimos", label: "Dízimos", href: "/dizimos", icon: "dizimos", permission: "dizimos.view" },
       { key: "ofertas", label: "Ofertas", href: "/ofertas", icon: "ofertas", permission: "ofertas.view" },
       { key: "entradas", label: "Entradas", href: "/entradas", icon: "entradas", permission: "entradas.view" },
-      { key: "saidas", label: "Saídas", href: "/saidas", icon: "saidas", permission: "saidas.view" },
+      { key: "saidas", label: "Contas a pagar", href: "/contas-a-pagar", icon: "saidas", permission: "saidas.view" },
       { key: "fornecedores", label: "Fornecedores", href: "/fornecedores", icon: "fornecedores", permission: "fornecedores.view" },
       { key: "plano-contas", label: "Plano de Contas", href: "/plano-contas", icon: "contas", permission: "planoContas.view" },
       { key: "centros-custo", label: "Centros de Custo", href: "/centros-custo", icon: "centrosCusto", permission: "centrosCusto.view" },
@@ -44,6 +45,7 @@ const NAV_GROUPS: Array<{ title?: string; items: NavEntry[] }> = [
     items: [
       { key: "estrutura", label: "Estrutura", href: "/estrutura", icon: "igrejas", permission: "igrejas.view" },
       { key: "usuarios", label: "Usuários", href: "/usuarios", icon: "usuarios", permission: "usuarios.view" },
+      { key: "cobranca", label: "Cobrança", href: "/cobranca", icon: "cobranca", permission: "config.view" },
       { key: "configuracoes", label: "Configurações", href: "/configuracoes", icon: "admin", permission: "config.view" },
     ],
   },
@@ -51,6 +53,7 @@ const NAV_GROUPS: Array<{ title?: string; items: NavEntry[] }> = [
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const user = await requireAuth();
+  const notices = await listActiveNotices();
 
   const hasPermission = (permission?: string) =>
     !permission ||
@@ -71,6 +74,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       userName={user.name ?? ""}
       userEmail={user.email ?? ""}
       navGroups={navGroups}
+      notices={notices}
     >
       {children}
     </AppShell>

@@ -9,9 +9,11 @@ export const dynamic = "force-dynamic";
 export default async function EstruturaLayout({ children }: { children: ReactNode }) {
   const user = await requirePermission("igrejas.view");
 
+  // A estrutura da igreja é composta pela sede e pelas congregações.
+  // Os demais cadastros (igrejas, membros etc.) ficam fora desta aba.
   const visibleResources = [];
   for (const r of RESOURCES) {
-    if (r.standalone) continue;
+    if (r.key !== "sedes" && r.key !== "congregacoes") continue;
     if (await can(user, r.viewPermission)) visibleResources.push(r);
   }
 
@@ -20,7 +22,7 @@ export default async function EstruturaLayout({ children }: { children: ReactNod
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Estrutura da Igreja</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Cadastro da igreja, suas sedes e congregações
+          Cadastro da sede e das congregações da igreja
         </p>
       </div>
 

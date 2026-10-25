@@ -5,7 +5,15 @@ export type { Option };
 export type FieldDef = {
   key: string;
   label: string;
-  type: "text" | "select" | "relation" | "checkbox" | "date" | "textarea" | "decimal";
+  type:
+    | "text"
+    | "select"
+    | "relation"
+    | "checkbox"
+    | "date"
+    | "textarea"
+    | "decimal"
+    | "image";
   required?: boolean;
   readonly?: boolean;
   options?: Option[];
@@ -138,15 +146,15 @@ export const RESOURCES: ResourceDef[] = [
   {
     key: "sedes",
     singular: "Sede",
-    plural: "Sedes",
-    description: "Unidades (sedes) da igreja",
+    plural: "Sede",
+    description: "Sede da igreja",
     viewPermission: "sedes.view",
     createPermission: "sedes.manage",
     editPermission: "sedes.manage",
     deletePermission: "sedes.manage",
     canCreate: true,
     canDelete: true,
-    newLabel: "Nova sede",
+    newLabel: "Cadastrar sede",
     fields: [
       { key: "name", label: "Nome", type: "text", required: true },
       { key: "cnpj", label: "CNPJ", type: "text", hint: "Somente números" },
@@ -219,6 +227,12 @@ export const RESOURCES: ResourceDef[] = [
         relation: { resourceKey: "congregacoes", valueField: "id", labelField: "name" },
       },
       { key: "name", label: "Nome completo", type: "text", required: true },
+      {
+        key: "photoUrl",
+        label: "Foto do membro",
+        type: "image",
+        hint: "JPG ou PNG. A imagem é otimizada automaticamente e usada na carteirinha.",
+      },
       {
         key: "cpf",
         label: "CPF",

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { getResource } from "@/modules/registration/definitions";
 import { requirePermission, can } from "@/lib/rbac";
+import { prisma } from "@/lib/prisma";
 import { listRows, getRelationOptions } from "@/services/registration.service";
 import { scopeFromUser } from "@/lib/scope";
 import {
@@ -35,7 +36,10 @@ export default async function ResourcePage({
   let canDelete = def.canDelete && (await can(user, def.deletePermission));
 
   if (resource === "sedes") {
-    canCreate = canCreate && canCreateSede(scope);
+    const sedeCount = await prisma.sede.count({
+      where: { churchId: user.churchId },
+    });
+    canCreate = canCreate && canCreateSede(scope) && sedeCount === 0;
     canEdit =
       canEdit &&
       (scope.isSuperAdmin ||

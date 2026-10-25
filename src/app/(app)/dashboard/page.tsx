@@ -1,8 +1,10 @@
-import { Building2, HandCoins, TrendingDown, Users } from "lucide-react";
+import { Building2, Church, HandCoins, TrendingDown, Users } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { requireAuth } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
+import { getChurchChargeSummary } from "@/services/charges.service";
+import { formatBRL } from "@/modules/platform/pricing";
 import { scopeFromUser, scopedCongregationIdsOrNull, congregationWhere } from "@/lib/scope";
 import {
   Card,
@@ -37,10 +39,13 @@ export default async function DashboardPage() {
     : null;
 
   const sedeUnit =
-    !user.congregationId && user.sedeId
-      ? await prisma.sede.findUnique({
-          where: { id: user.sedeId },
+    !user.congregationId && user.churchId
+      ? await prisma.sede.findFirst({
+          where: user.sedeId
+            ? { id: user.sedeId, churchId: user.churchId }
+            : { churchId: user.churchId },
           select: { name: true },
+          orderBy: { name: "asc" },
         })
       : null;
 
@@ -48,7 +53,10 @@ export default async function DashboardPage() {
     ? `${congregationUnit.sede.name} · ${congregationUnit.name}`
     : user.sedeId
       ? sedeUnit?.name ?? "Sede"
-      : "Todas as sedes";
+      : "Sede e congregações";
+
+  const sedeName =
+    congregationUnit?.sede.name ?? sedeUnit?.name ?? "Não cadastrada";
 
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -111,6 +119,10 @@ export default async function DashboardPage() {
   const monthRevenue = Number(incomeAgg._sum.value ?? 0);
   const monthExpense = Number(expenseAgg._sum.value ?? 0);
 
+  const chargeSummary = user.churchId
+    ? await getChurchChargeSummary(user.churchId)
+    : null;
+
   const cashflow = new Map<string, { month: string; revenue: number; expense: number }>();
   for (let i = 5; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
@@ -130,7 +142,8 @@ export default async function DashboardPage() {
   }));
 
   const cards = [
-    { title: "Congregações", value: congregations, icon: Building2 },
+    { title: "Sede", value: sedeName, icon: Building2, text: true },
+    { title: "Congregações", value: congregations, icon: Church },
     { title: "Membros", value: members, icon: Users },
     { title: "Saídas pendentes", value: pendingExpenses, icon: TrendingDown },
     {
@@ -153,7 +166,7 @@ export default async function DashboardPage() {
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         {cards.map((card) => (
           <Card key={card.title}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -163,11 +176,43 @@ export default async function DashboardPage() {
               <card.icon className={`size-4 ${"money" in card && card.money ? "text-primary" : "text-muted-foreground"}`} />
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold sm:text-3xl">{card.value}</p>
+              {"text" in card && card.text ? (
+                <p
+                  className="truncate text-lg font-semibold"
+                  title={String(card.value)}
+                >
+                  {card.value}
+                </p>
+              ) : (
+                <p className="text-2xl font-bold sm:text-3xl">{card.value}</p>
+              )}
             </CardContent>
           </Card>
         ))}
       </div>
+
+      {chargeSummary && chargeSummary.open ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-muted/20 px-4 py-3">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold">
+              Cobrança da plataforma ·{" "}
+              {formatBRL(chargeSummary.open.amount)}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {chargeSummary.open.description} · vence em{" "}
+              {new Date(
+                `${chargeSummary.open.dueDate.slice(0, 10)}T12:00:00`
+              ).toLocaleDateString("pt-BR")}
+              {chargeSummary.overdueAmount > 0
+                ? ` · vencido ${formatBRL(chargeSummary.overdueAmount)}`
+                : ""}
+            </p>
+          </div>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/cobranca">Ver cobranças</Link>
+          </Button>
+        </div>
+      ) : null}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>

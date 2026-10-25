@@ -6,6 +6,7 @@ import { accessibleCongregations, type DataScope } from "@/lib/scope";
 export type MemberReportRow = {
   code: string;
   name: string;
+  cpf: string | null;
   congregation: string;
   situation: string;
   gender: string | null;
@@ -58,7 +59,10 @@ export type ReportContext = {
   churchId: string;
   churchName: string;
   churchCnpj: string | null;
+  churchPhone: string | null;
+  churchEmail: string | null;
   sedeName: string | null;
+  addressLine: string | null;
   logoUrl: string | null;
 };
 
@@ -69,13 +73,29 @@ function toMonthKey(d: Date): string {
 export async function getReportContext(churchId: string): Promise<ReportContext> {
   const church = await prisma.church.findUnique({
     where: { id: churchId },
-    include: { sedes: { take: 1 } },
+    include: { sedes: { take: 1, orderBy: { createdAt: "asc" } } },
   });
+  const sede = church?.sedes[0] ?? null;
+
+  const cityState = [sede?.city, sede?.state].filter(Boolean).join("/");
+  const addressLine =
+    [
+      sede?.address,
+      sede?.district,
+      cityState || null,
+      sede?.cep ? `CEP ${sede.cep}` : null,
+    ]
+      .filter(Boolean)
+      .join(" · ") || null;
+
   return {
     churchId,
     churchName: church?.legalName || church?.name || "Igreja",
-    churchCnpj: church?.cnpj ?? null,
-    sedeName: church?.sedes[0]?.name ?? null,
+    churchCnpj: church?.cnpj ?? sede?.cnpj ?? null,
+    churchPhone: church?.phone ?? sede?.phone ?? null,
+    churchEmail: church?.email ?? sede?.email ?? null,
+    sedeName: sede?.name ?? null,
+    addressLine,
     logoUrl: church?.logoUrl ?? null,
   };
 }
@@ -95,12 +115,20 @@ export async function fetchCongregations(scope: DataScope) {
 async function restrictCongregation(
   where: Record<string, unknown>,
   congregationId: string | undefined,
-  congregationIds: string[] | null | undefined
+  congregationIds: string[] | null | undefined,
+  selectedCongregationIds?: string[] | undefined
 ): Promise<Record<string, unknown>> {
   if (congregationIds) {
+    const selected = selectedCongregationIds?.length
+      ? selectedCongregationIds.filter((id) => congregationIds.includes(id))
+      : congregationIds;
     where.congregationId = {
-      in: congregationIds.length ? congregationIds : ["__none__"],
+      in: selected.length ? selected : ["__none__"],
     };
+    return where;
+  }
+  if (selectedCongregationIds?.length) {
+    where.congregationId = { in: selectedCongregationIds };
     return where;
   }
   if (congregationId) where.congregationId = congregationId;
@@ -114,11 +142,17 @@ export async function getMemberReport(
     congregationId?: string;
     situation?: string;
     congregationIds?: string[] | null;
+    selectedCongregationIds?: string[];
   } = {}
 ) {
   const where: Record<string, unknown> = { churchId };
   if (opts.situation) where.situation = opts.situation;
-  await restrictCongregation(where, opts.congregationId, opts.congregationIds);
+  await restrictCongregation(
+    where,
+    opts.congregationId,
+    opts.congregationIds,
+    opts.selectedCongregationIds
+  );
 
   const members = await prisma.member.findMany({
     where,
@@ -129,6 +163,7 @@ export async function getMemberReport(
   const rows: MemberReportRow[] = members.map((m) => ({
     code: m.code,
     name: m.name,
+    cpf: m.cpf,
     congregation: m.congregation?.name ?? "—",
     situation: m.situation,
     gender: m.gender,

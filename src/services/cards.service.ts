@@ -4,10 +4,25 @@ import { prisma } from "@/lib/prisma";
 import { auditLog } from "@/services/audit.service";
 import { assertCongregationInScope, type DataScope } from "@/lib/scope";
 
-function issueDate() {
+function defaultValidity(): Date {
   const d = new Date();
   d.setFullYear(d.getFullYear() + 2);
   return d;
+}
+
+function normalizeValidity(value?: Date | null): Date {
+  const validity = value ?? defaultValidity();
+  if (Number.isNaN(validity.getTime())) {
+    throw new Error("Data de validade inválida.");
+  }
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const compare = new Date(validity);
+  compare.setHours(0, 0, 0, 0);
+  if (compare < today) {
+    throw new Error("A validade da carteirinha deve ser uma data futura.");
+  }
+  return validity;
 }
 
 function congregationIn(ids: string[] | null | undefined) {
@@ -100,6 +115,7 @@ export async function issueCards(
   churchId: string,
   userId: string,
   memberIds: string[],
+  validityDate?: Date | null,
   scope?: DataScope
 ) {
   const uniqueIds = Array.from(new Set(memberIds.filter(Boolean)));
@@ -107,6 +123,8 @@ export async function issueCards(
   if (uniqueIds.length > 200) {
     throw new Error("Selecione no máximo 200 membros por lote.");
   }
+
+  const validity = normalizeValidity(validityDate);
 
   const members = await prisma.member.findMany({
     where: { id: { in: uniqueIds }, churchId },
@@ -123,7 +141,6 @@ export async function issueCards(
   }
 
   const count = await prisma.membershipCard.count({ where: { churchId } });
-  const validityDate = issueDate();
 
   const cards = await prisma.$transaction(async (tx) => {
     const created = [];
@@ -135,7 +152,7 @@ export async function issueCards(
             congregationId: member.congregationId,
             memberId: member.id,
             cardNumber: String(count + index + 1).padStart(6, "0"),
-            validityDate,
+            validityDate: validity,
             status: "ATIVO",
             qrToken: randomUUID(),
             createdById: userId,
@@ -166,9 +183,10 @@ export async function issueCard(
   churchId: string,
   userId: string,
   memberId: string,
+  validityDate?: Date | null,
   scope?: DataScope
 ) {
-  const [card] = await issueCards(churchId, userId, [memberId], scope);
+  const [card] = await issueCards(churchId, userId, [memberId], validityDate, scope);
   return card;
 }
 

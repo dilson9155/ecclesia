@@ -119,7 +119,7 @@ function Stat({
   icon: Icon,
 }: {
   label: string;
-  value: number;
+  value: string | number;
   icon: LucideIcon;
 }) {
   return (
@@ -128,7 +128,16 @@ function Stat({
         <Icon className="size-3.5" />
         {label}
       </div>
-      <p className="mt-1 text-xl font-semibold tracking-tight">{value}</p>
+      <p
+        className={
+          typeof value === "string"
+            ? "mt-1 truncate text-sm font-semibold tracking-tight"
+            : "mt-1 text-xl font-semibold tracking-tight"
+        }
+        title={typeof value === "string" ? value : undefined}
+      >
+        {value}
+      </p>
     </div>
   );
 }
@@ -329,8 +338,17 @@ export function StructureOverview({
     router.refresh();
   }
 
+  const singleSede = data.sedes[0];
+  const canEditSingleSede = Boolean(
+    singleSede && canEditSede(scope, singleSede.id)
+  );
+
   const totals = [
-    { label: "Sedes", value: data.totals.sedes, icon: Building2 },
+    {
+      label: "Sede",
+      value: singleSede?.name ?? "Não cadastrada",
+      icon: Building2,
+    },
     { label: "Congregações", value: data.totals.congregations, icon: Church },
     { label: "Membros", value: data.totals.members, icon: Users },
     { label: "Usuários", value: data.totals.users, icon: UserCog },
@@ -341,22 +359,32 @@ export function StructureOverview({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold tracking-tight">
-            Visão geral da estrutura
+            Sede e congregações
           </h2>
           <p className="text-sm text-muted-foreground">
             Você está vendo <span className="font-medium">{data.scopeLabel}</span>.
             {data.canManageSedes
-              ? " Cadastre sedes e organize as congregações de cada unidade."
+              ? " Mantenha os dados da sede da igreja e organize as congregações."
               : data.canManageCongregations
                 ? " Gerencie as congregações da sua sede."
                 : " Acesso somente leitura à sua congregação."}
           </p>
         </div>
         <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-          {data.canManageSedes && (
+          {data.canManageSedes && data.sedes.length === 0 && (
             <Button onClick={openSedeCreate} className="flex-1 sm:flex-none">
               <Plus className="h-4 w-4" />
-              Nova sede
+              Cadastrar sede
+            </Button>
+          )}
+          {data.sedes.length > 0 && canEditSingleSede && (
+            <Button
+              variant="outline"
+              onClick={() => openSedeEdit(singleSede)}
+              className="flex-1 sm:flex-none"
+            >
+              <Pencil className="h-4 w-4" />
+              Editar sede
             </Button>
           )}
           {data.canManageCongregations && data.sedes.length > 0 && (
@@ -625,11 +653,10 @@ export function StructureOverview({
         <DialogContent className="max-h-[85dvh] max-w-2xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {sedeDialog?.mode === "edit" ? "Editar sede" : "Nova sede"}
+              {sedeDialog?.mode === "edit" ? "Editar sede" : "Cadastrar sede"}
             </DialogTitle>
             <DialogDescription>
-              Dados da unidade. Cada sede poderá gerenciar suas próprias
-              congregações.
+              Dados da sede da igreja. As congregações ficam vinculadas a ela.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSedeSubmit} className="space-y-4">

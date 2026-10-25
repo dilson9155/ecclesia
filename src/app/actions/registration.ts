@@ -21,7 +21,7 @@ const STANDALONE_PATHS: Record<string, string> = {
   ofertas: "/ofertas",
   fornecedores: "/fornecedores",
   entradas: "/entradas",
-  saidas: "/saidas",
+  saidas: "/contas-a-pagar",
 };
 
 function resourcePaths(resourceKey: string): string[] {

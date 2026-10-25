@@ -180,6 +180,19 @@ export function buildData(resourceKey: string, values: Record<string, unknown>) 
       const error = validateField(resourceKey, field.key, String(values[field.key]));
       if (error) throw new Error(error);
     }
+    if (field.type === "image") {
+      const image = values[field.key];
+      if (typeof image === "string" && image) {
+        if (!/^data:image\/(jpeg|png|webp);base64,/i.test(image)) {
+          throw new Error(`Imagem inválida: ${field.label}.`);
+        }
+        if (image.length > 700_000) {
+          throw new Error(
+            `A imagem de ${field.label.toLowerCase()} é muito grande. Envie um arquivo menor.`
+          );
+        }
+      }
+    }
     const value = coerceValue(field, values[field.key]);
     if (value === null) continue;
     data[field.key] = value;
@@ -368,6 +381,18 @@ async function assertStructureWrite(
           "O plano desta igreja permite apenas uma sede. Fale com o administrador da plataforma para alterar o plano."
         );
       }
+    }
+  }
+
+  // A igreja possui uma única sede; as demais unidades são congregações.
+  if (resourceKey === "sedes" && !id) {
+    const sedeCount = await prisma.sede.count({
+      where: { churchId: scope.churchId },
+    });
+    if (sedeCount > 0) {
+      throw new Error(
+        "Esta igreja já possui uma sede cadastrada. Cadastre congregações vinculadas a ela."
+      );
     }
   }
 
