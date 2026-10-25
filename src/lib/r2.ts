@@ -51,7 +51,12 @@ export async function uploadToR2(
   const response = await client.fetch(url, {
     method: "PUT",
     body: body as unknown as BodyInit,
-    headers: { "content-type": contentType },
+    headers: {
+      "content-type": contentType,
+      // O R2 recusa uploads sem Content-Length; no runtime da Vercel o fetch
+      // não calcula esse header automaticamente para Uint8Array.
+      "content-length": String(body.byteLength),
+    },
   });
 
   if (!response.ok) {
