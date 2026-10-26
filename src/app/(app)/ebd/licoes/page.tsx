@@ -19,6 +19,7 @@ export default async function EbdLessonsPage() {
     listClasses(scope),
   ]);
   const canManage = await can(user, "ebd.manage");
+  const canAttendance = await can(user, "ebd.attendance");
 
   return (
     <LessonsManager
@@ -26,6 +27,7 @@ export default async function EbdLessonsPage() {
       lessons={lessons}
       classes={classes}
       canManage={canManage}
+      canAttendance={canAttendance}
     />
   );
 }

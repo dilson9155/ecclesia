@@ -707,7 +707,8 @@ export function StudentsManager({
             <DialogTitle>Remover aluno da EBD</DialogTitle>
             <DialogDescription>
               <strong>{deleting?.name}</strong> será removido(a) da EBD. O cadastro de
-              membro é mantido. As chamadas já registradas também são mantidas.
+              membro é mantido, mas as pontuações deste aluno nas chamadas já
+              registradas também serão removidas.
             </DialogDescription>
           </DialogHeader>
           {error ? (

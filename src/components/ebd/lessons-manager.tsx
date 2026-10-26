@@ -44,6 +44,7 @@ type Props = {
   lessons: EbdLessonView[];
   classes: EbdClassView[];
   canManage: boolean;
+  canAttendance: boolean;
 };
 
 type QuarterForm = {
@@ -95,7 +96,7 @@ function defaultQuarter(): QuarterForm {
   };
 }
 
-export function LessonsManager({ quarters, lessons, classes, canManage }: Props) {
+export function LessonsManager({ quarters, lessons, classes, canManage, canAttendance }: Props) {
   const router = useRouter();
   const [quarterFilter, setQuarterFilter] = useState(quarters[0]?.id ?? "");
   const [classFilter, setClassFilter] = useState("");
@@ -433,7 +434,7 @@ export function LessonsManager({ quarters, lessons, classes, canManage }: Props)
                     </td>
                     <td className="px-3 py-2">
                       <div className="flex justify-end gap-1">
-                        {canManage ? (
+                        {canAttendance ? (
                           <Button variant="outline" size="sm" asChild>
                             <Link href={`/ebd/chamadas?lesson=${lesson.id}`}>
                               <ClipboardList className="mr-1.5 size-4" />
