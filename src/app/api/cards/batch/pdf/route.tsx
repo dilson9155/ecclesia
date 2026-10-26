@@ -5,13 +5,8 @@ import { scopeFromUser, scopedCongregationIdsOrNull } from "@/lib/scope";
 import { getCardsForPdf } from "@/services/cards.service";
 import { getChurchBranding } from "@/services/branding.service";
 import { auditLog } from "@/services/audit.service";
-import {
-  MemberCardFront,
-  type MemberCardPdfData,
-} from "@/components/carteirinhas/member-card-pdf";
-
-const CARDS_PER_PAGE = 5;
-const CARDS_PER_ROW = 2;
+import { buildCardSheetPages } from "@/components/carteirinhas/card-sheet";
+import type { MemberCardPdfData } from "@/components/carteirinhas/member-card-pdf";
 
 export async function GET(request: Request) {
   const user = await requirePermission("carteirinhas.view");
@@ -29,6 +24,10 @@ export async function GET(request: Request) {
   if (ids.length === 0) {
     return new Response("Selecione pelo menos uma carteirinha.", { status: 400 });
   }
+
+  // "both" (padrão) imprime frente e verso em páginas intercaladas para
+  // duplex; "front" mantém apenas as frentes.
+  const includeBack = searchParams.get("faces") !== "front";
 
   const congregationIds = await scopedCongregationIdsOrNull(scopeFromUser(user));
   const [cards, branding] = await Promise.all([
@@ -91,43 +90,10 @@ export async function GET(request: Request) {
     })
   );
 
-  const pages = [];
-  for (let offset = 0; offset < data.length; offset += CARDS_PER_PAGE) {
-    const group = data.slice(offset, offset + CARDS_PER_PAGE);
-    const rows = [];
-    for (let rowIndex = 0; rowIndex < CARDS_PER_PAGE; rowIndex += CARDS_PER_ROW) {
-      const rowCards = group.slice(rowIndex, rowIndex + CARDS_PER_ROW);
-      if (rowCards.length === 0) break;
-      rows.push(
-        <PDF.View key={`row-${rowIndex}`} style={{ flexDirection: "row", gap: 9 }}>
-          {rowCards.map((card) => (
-            <MemberCardFront key={card.id} data={card} />
-          ))}
-        </PDF.View>
-      );
-    }
-
-    pages.push(
-      <PDF.Page
-        key={`page-${offset}`}
-        size="A4"
-        style={{
-          paddingTop: 17,
-          paddingBottom: 17,
-          paddingHorizontal: 17,
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 9,
-        }}
-      >
-        {rows}
-      </PDF.Page>
-    );
-  }
-
   const doc = (
-    <PDF.Document title="Carteirinhas em lote">{pages}</PDF.Document>
+    <PDF.Document title="Carteirinhas em lote">
+      {buildCardSheetPages(data, includeBack)}
+    </PDF.Document>
   );
 
   const buffer = await PDF.renderToBuffer(doc);

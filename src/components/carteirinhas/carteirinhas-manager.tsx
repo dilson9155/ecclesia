@@ -101,6 +101,7 @@ export function CarteirinhasManager({ cards, members, canEmit, canCancel }: Prop
   const [lastIssuedIds, setLastIssuedIds] = useState<string[]>([]);
   const [success, setSuccess] = useState<string | null>(null);
   const [batchValidity, setBatchValidity] = useState(defaultValidity());
+  const [includeBack, setIncludeBack] = useState(true);
 
   const form = useForm<{ memberId: string; validityDate: string }>({
     defaultValues: { memberId: "", validityDate: defaultValidity() },
@@ -242,8 +243,11 @@ export function CarteirinhasManager({ cards, members, canEmit, canCancel }: Prop
     router.refresh();
   }
 
-  const batchUrl = `/api/cards/batch/pdf?ids=${batchCardList.map((card) => card.id).join(",")}`;
-  const lastIssuedUrl = `/api/cards/batch/pdf?ids=${lastIssuedIds.join(",")}`;
+  const faces = includeBack ? "both" : "front";
+  const batchUrl = `/api/cards/batch/pdf?ids=${batchCardList
+    .map((card) => card.id)
+    .join(",")}&faces=${faces}`;
+  const lastIssuedUrl = `/api/cards/batch/pdf?ids=${lastIssuedIds.join(",")}&faces=${faces}`;
 
   return (
     <div className="space-y-4">
@@ -299,27 +303,38 @@ export function CarteirinhasManager({ cards, members, canEmit, canCancel }: Prop
             ? `${selectedCardList.length} carteirinha(s) selecionada(s)${
                 selectedCardList.length > 100 ? " · máximo de 100 por PDF" : ""
               }`
-            : "Selecione carteirinhas ativas para montar uma folha A4 com 5 unidades por página."}
+            : "Selecione carteirinhas ativas para montar uma folha A4 com 5 unidades por página (frente e verso)."}
         </p>
-        <Button
-          asChild
-          size="sm"
-          disabled={selectedCardList.length === 0}
-          className="w-full shrink-0 sm:w-auto"
-        >
-          <a
-            href={selectedCardList.length > 0 ? batchUrl : "#"}
-            target="_blank"
-            rel="noreferrer"
-            aria-disabled={selectedCardList.length === 0}
-            onClick={(event) => {
-              if (selectedCardList.length === 0) event.preventDefault();
-            }}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <label className="flex items-center gap-2 text-sm text-muted-foreground">
+            <input
+              type="checkbox"
+              className="size-4 rounded border-input accent-primary"
+              checked={includeBack}
+              onChange={(event) => setIncludeBack(event.target.checked)}
+            />
+            Imprimir verso
+          </label>
+          <Button
+            asChild
+            size="sm"
+            disabled={selectedCardList.length === 0}
+            className="w-full shrink-0 sm:w-auto"
           >
-            <Download className="mr-1.5 h-3.5 w-3.5" />
-            Gerar folha A4 ({batchCardList.length})
-          </a>
-        </Button>
+            <a
+              href={selectedCardList.length > 0 ? batchUrl : "#"}
+              target="_blank"
+              rel="noreferrer"
+              aria-disabled={selectedCardList.length === 0}
+              onClick={(event) => {
+                if (selectedCardList.length === 0) event.preventDefault();
+              }}
+            >
+              <Download className="mr-1.5 h-3.5 w-3.5" />
+              Gerar folha A4 ({batchCardList.length})
+            </a>
+          </Button>
+        </div>
       </div>
 
       <div className="space-y-2 md:hidden">
@@ -552,7 +567,7 @@ export function CarteirinhasManager({ cards, members, canEmit, canCancel }: Prop
             </DialogTitle>
             <DialogDescription>
               Selecione os membros ativos. Em seguida você poderá gerar uma folha A4 com até 5
-              carteirinhas por página.
+              carteirinhas por página, com frente e verso para impressão duplex.
             </DialogDescription>
           </DialogHeader>
 
