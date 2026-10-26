@@ -1,5 +1,5 @@
 import { requirePermission } from "@/lib/rbac";
-import { scopeFromUser, scopedCongregationIdsOrNull } from "@/lib/scope";
+import { ebdScopeFromUser } from "@/lib/ebd-scope";
 import { listClasses } from "@/services/ebd.service";
 import {
   getBirthdays,
@@ -41,8 +41,7 @@ export default async function EbdReportsPage({ searchParams }: Props) {
       ? monthParam
       : new Date().getMonth() + 1;
 
-  const congregationIds = await scopedCongregationIdsOrNull(scopeFromUser(user));
-  const scope = { churchId: user.churchId, congregationIds };
+  const scope = await ebdScopeFromUser(user);
 
   const [quarters, classes] = await Promise.all([
     listQuarters(scope),

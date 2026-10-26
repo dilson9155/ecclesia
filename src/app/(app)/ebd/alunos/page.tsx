@@ -1,9 +1,6 @@
 import { requirePermission, can } from "@/lib/rbac";
-import {
-  accessibleCongregations,
-  scopeFromUser,
-  scopedCongregationIdsOrNull,
-} from "@/lib/scope";
+import { accessibleCongregations, scopeFromUser } from "@/lib/scope";
+import { ebdScopeFromUser } from "@/lib/ebd-scope";
 import {
   listClasses,
   listMemberOptions,
@@ -18,8 +15,7 @@ export default async function EbdStudentsPage() {
   if (!user.churchId) return null;
 
   const dataScope = scopeFromUser(user);
-  const congregationIds = await scopedCongregationIdsOrNull(dataScope);
-  const scope = { churchId: user.churchId, congregationIds };
+  const scope = await ebdScopeFromUser(user);
 
   const [students, classes, members, congregations] = await Promise.all([
     listStudents(scope),

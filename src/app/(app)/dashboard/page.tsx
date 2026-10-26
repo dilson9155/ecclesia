@@ -1,7 +1,8 @@
 import { Building2, Church, HandCoins, TrendingDown, Users } from "lucide-react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { requireAuth } from "@/lib/rbac";
+import { can, requireAuth } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import { getChurchChargeSummary } from "@/services/charges.service";
 import { formatBRL } from "@/modules/platform/pricing";
@@ -23,6 +24,10 @@ function monthKey(d: Date): string {
 
 export default async function DashboardPage() {
   const user = await requireAuth();
+
+  if (!(await can(user, "dashboard.view"))) {
+    redirect((await can(user, "ebd.view")) ? "/ebd" : "/forbidden");
+  }
 
   const church = user.churchId
     ? await prisma.church.findUnique({

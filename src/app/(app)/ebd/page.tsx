@@ -8,7 +8,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { requirePermission, can } from "@/lib/rbac";
-import { scopeFromUser, scopedCongregationIdsOrNull } from "@/lib/scope";
+import { ebdScopeFromUser, isEbdTeacherOnly } from "@/lib/ebd-scope";
 import { getEbdOverview } from "@/services/ebd.service";
 import { StatCard } from "@/components/ebd/ebd-ui";
 
@@ -18,9 +18,10 @@ export default async function EbdOverviewPage() {
   const user = await requirePermission("ebd.view");
   if (!user.churchId) return null;
 
-  const congregationIds = await scopedCongregationIdsOrNull(scopeFromUser(user));
-  const overview = await getEbdOverview({ churchId: user.churchId, congregationIds });
+  const scope = await ebdScopeFromUser(user);
+  const overview = await getEbdOverview(scope);
   const canReports = await can(user, "ebd.reports");
+  const professorOnly = isEbdTeacherOnly(user);
 
   const shortcuts = [
     {
@@ -29,18 +30,22 @@ export default async function EbdOverviewPage() {
       description: "Matricule membros e controle a participação na EBD.",
       icon: Users,
     },
-    {
-      href: "/ebd/professores",
-      title: "Professores",
-      description: "Defina quem leciona em cada classe.",
-      icon: UserRound,
-    },
-    {
-      href: "/ebd/classes",
-      title: "Classes",
-      description: "Organize as turmas e a capacidade de alunos.",
-      icon: GraduationCap,
-    },
+    ...(!professorOnly
+      ? [
+          {
+            href: "/ebd/professores",
+            title: "Professores",
+            description: "Defina quem leciona em cada classe.",
+            icon: UserRound,
+          },
+          {
+            href: "/ebd/classes",
+            title: "Classes",
+            description: "Organize as turmas e a capacidade de alunos.",
+            icon: GraduationCap,
+          },
+        ]
+      : []),
     {
       href: "/ebd/licoes",
       title: "Lições do trimestre",

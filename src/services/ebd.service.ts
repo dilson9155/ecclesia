@@ -8,6 +8,8 @@ export type EbdScope = {
   churchId: string;
   /** null = todas as congregações da igreja. */
   congregationIds: string[] | null;
+  /** null/undefined = todas as classes do escopo; array = somente essas classes. */
+  classIds?: string[] | null;
 };
 
 export type EbdClassView = {
@@ -78,12 +80,21 @@ export type EbdOverview = {
 };
 
 function congregationFilter(scope: EbdScope): Prisma.EbdClassWhereInput {
-  if (scope.congregationIds === null) return {};
-  return {
-    congregationId: {
+  const filter: Prisma.EbdClassWhereInput = {};
+
+  if (scope.congregationIds !== null) {
+    filter.congregationId = {
       in: scope.congregationIds.length > 0 ? scope.congregationIds : ["__none__"],
-    },
-  };
+    };
+  }
+
+  if (scope.classIds !== null && scope.classIds !== undefined) {
+    filter.id = {
+      in: scope.classIds.length > 0 ? scope.classIds : ["__none__"],
+    };
+  }
+
+  return filter;
 }
 
 function toIso(value: Date | null | undefined): string | null {
@@ -690,8 +701,24 @@ export async function listTeachers(
   if (filters?.status === "ATIVO") where.active = true;
   if (filters?.status === "INATIVO") where.active = false;
 
+  const classRestrictions: Prisma.EbdTeacherClassWhereInput[] = [];
+  if (scope.classIds !== null && scope.classIds !== undefined) {
+    classRestrictions.push({
+      classId: {
+        in: scope.classIds.length > 0 ? scope.classIds : ["__none__"],
+      },
+    });
+  }
   if (filters?.classId) {
-    where.classes = { some: { classId: filters.classId } };
+    classRestrictions.push({ classId: filters.classId });
+  }
+  if (classRestrictions.length > 0) {
+    where.classes = {
+      some:
+        classRestrictions.length === 1
+          ? classRestrictions[0]
+          : { AND: classRestrictions },
+    };
   }
 
   const search = filters?.search?.trim();
@@ -725,6 +752,10 @@ export async function listTeachers(
 
   const allowed =
     scope.congregationIds === null ? null : new Set(scope.congregationIds);
+  const allowedClasses =
+    scope.classIds === null || scope.classIds === undefined
+      ? null
+      : new Set(scope.classIds);
 
   return rows.map((row) => ({
     id: row.id,
@@ -735,7 +766,11 @@ export async function listTeachers(
     active: row.active,
     notes: row.notes,
     classes: row.classes
-      .filter((link) => !allowed || allowed.has(link.class.congregationId))
+      .filter(
+        (link) =>
+          (!allowed || allowed.has(link.class.congregationId)) &&
+          (!allowedClasses || allowedClasses.has(link.class.id))
+      )
       .map((link) => ({ id: link.class.id, name: link.class.name }))
       .sort((a, b) => a.name.localeCompare(b.name)),
   }));
@@ -911,6 +946,14 @@ export async function listMemberOptions(
         }),
   };
 
+  if (scope.classIds !== null && scope.classIds !== undefined) {
+    where.ebdStudent = {
+      classId: {
+        in: scope.classIds.length > 0 ? scope.classIds : ["__none__"],
+      },
+    };
+  }
+
   const term = search?.trim();
   if (term) {
     where.OR = [
@@ -980,11 +1023,30 @@ export async function getEbdOverview(scope: EbdScope): Promise<EbdOverview> {
                   },
                 },
               }),
+          ...(scope.classIds !== null && scope.classIds !== undefined
+            ? {
+                classes: {
+                  some: {
+                    classId: {
+                      in:
+                        scope.classIds.length > 0
+                          ? scope.classIds
+                          : ["__none__"],
+                    },
+                  },
+                },
+              }
+            : {}),
         },
         select: { active: true },
       }),
       prisma.ebdQuarter.findMany({
-        where: { churchId: scope.churchId },
+        where: {
+          churchId: scope.churchId,
+          ...(scope.classIds !== null && scope.classIds !== undefined
+            ? { lessons: { some: { class: congregationFilter(scope) } } }
+            : {}),
+        },
         select: { status: true },
       }),
       prisma.ebdLesson.count({

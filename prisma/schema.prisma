@@ -35,9 +35,12 @@ enum UserRoleName {
   SUPER_ADMIN
   ADMIN_SEDE
   ADMIN_CONGREGACAO
+  SUPERINTENDENTE_EBD
   FINANCEIRO
+  SECRETARIA_EBD
   SECRETARIA
   PASTOR
+  PROFESSOR_EBD
   CONSULTA
 }
 
@@ -357,6 +360,7 @@ model User {
   closingsClosed          FinancialClosing[]   @relation("ClosingClosedBy")
   closingsReopened        FinancialClosing[]   @relation("ClosingReopenedBy")
   ebdAttendances          EbdAttendance[]
+  ebdTeacher              EbdTeacher?
 
   @@index([churchId])
   @@index([sedeId])
@@ -1022,6 +1026,9 @@ model EbdTeacher {
   church    Church   @relation(fields: [churchId], references: [id], onDelete: Restrict)
   memberId  String   @unique
   member    Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  /// Usuário de acesso ao sistema vinculado a este professor (perfil Professor EBD).
+  userId    String?  @unique
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   active    Boolean  @default(true)
   notes     String?
   createdAt DateTime @default(now())

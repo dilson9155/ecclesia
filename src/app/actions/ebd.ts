@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/rbac";
-import { scopeFromUser, scopedCongregationIdsOrNull } from "@/lib/scope";
+import { ebdScopeFromUser } from "@/lib/ebd-scope";
 import {
   createClass,
   createTeacher,
@@ -46,10 +46,10 @@ async function ebdScope(permission: string): Promise<
   if (!user.churchId) {
     return { ok: false, error: "Nenhuma igreja vinculada ao seu usuário." };
   }
-  const congregationIds = await scopedCongregationIdsOrNull(scopeFromUser(user));
+  const scope = await ebdScopeFromUser(user);
   return {
     ok: true,
-    scope: { churchId: user.churchId, congregationIds },
+    scope,
     userId: user.id,
   };
 }

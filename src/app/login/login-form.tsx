@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { signIn } from "next-auth/react";
+import { signIn, getSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -43,6 +43,21 @@ export function LoginForm() {
       if (result?.error) {
         setError("Credenciais inválidas. Verifique e-mail e senha.");
         return;
+      }
+
+      if (callbackUrl === "/") {
+        const session = await getSession();
+        const permissions = session?.user?.permissions ?? [];
+        const hasAll = permissions.includes("*");
+        if (
+          !hasAll &&
+          !permissions.includes("dashboard.view") &&
+          permissions.includes("ebd.view")
+        ) {
+          router.push("/ebd");
+          router.refresh();
+          return;
+        }
       }
 
       router.push(callbackUrl);

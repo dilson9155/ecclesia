@@ -80,12 +80,21 @@ export type EbdAttendanceEntryInput = {
 };
 
 function congregationFilter(scope: EbdScope): Prisma.EbdClassWhereInput {
-  if (scope.congregationIds === null) return {};
-  return {
-    congregationId: {
+  const filter: Prisma.EbdClassWhereInput = {};
+
+  if (scope.congregationIds !== null) {
+    filter.congregationId = {
       in: scope.congregationIds.length > 0 ? scope.congregationIds : ["__none__"],
-    },
-  };
+    };
+  }
+
+  if (scope.classIds !== null && scope.classIds !== undefined) {
+    filter.id = {
+      in: scope.classIds.length > 0 ? scope.classIds : ["__none__"],
+    };
+  }
+
+  return filter;
 }
 
 function toIso(value: Date | null | undefined): string | null {
@@ -103,9 +112,29 @@ function parseDate(value: string | null | undefined): Date | null {
 /* -------------------------------------------------------------------------- */
 
 export async function listQuarters(scope: EbdScope): Promise<EbdQuarterView[]> {
+  const restricted =
+    scope.classIds !== null && scope.classIds !== undefined;
+
   const rows = await prisma.ebdQuarter.findMany({
-    where: { churchId: scope.churchId },
-    include: { _count: { select: { lessons: true, attendances: true } } },
+    where: {
+      churchId: scope.churchId,
+      ...(restricted
+        ? {
+            OR: [
+              { lessons: { some: { class: congregationFilter(scope) } } },
+              { attendances: { some: { class: congregationFilter(scope) } } },
+            ],
+          }
+        : {}),
+    },
+    include: {
+      _count: {
+        select: {
+          lessons: { where: { class: congregationFilter(scope) } },
+          attendances: { where: { class: congregationFilter(scope) } },
+        },
+      },
+    },
     orderBy: [{ startDate: "desc" }],
   });
 
@@ -677,6 +706,20 @@ function sanitizeEntries(
     }));
 }
 
+async function assertStudentsInClass(
+  classId: string,
+  entries: EbdAttendanceEntryInput[]
+): Promise<void> {
+  const ids = entries.map((entry) => entry.studentId);
+  const rows = await prisma.ebdStudent.findMany({
+    where: { id: { in: ids }, classId },
+    select: { id: true },
+  });
+  if (rows.length !== ids.length) {
+    throw new Error("Um dos alunos não pertence à classe desta lição.");
+  }
+}
+
 export async function createAttendance(
   scope: EbdScope,
   input: {
@@ -704,6 +747,7 @@ export async function createAttendance(
   if (entries.length === 0) {
     throw new Error("A chamada precisa ter pelo menos um aluno.");
   }
+  await assertStudentsInClass(lesson.classId, entries);
 
   const created = await prisma.ebdAttendance.create({
     data: {
@@ -767,6 +811,7 @@ export async function updateAttendance(
   if (entries.length === 0) {
     throw new Error("A chamada precisa ter pelo menos um aluno.");
   }
+  await assertStudentsInClass(existing.classId, entries);
 
   await prisma.$transaction(async (tx) => {
     await tx.ebdAttendanceEntry.deleteMany({ where: { attendanceId: id } });

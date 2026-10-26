@@ -1,6 +1,6 @@
 import * as PDF from "@react-pdf/renderer";
 import { requirePermission } from "@/lib/rbac";
-import { scopeFromUser, scopedCongregationIdsOrNull } from "@/lib/scope";
+import { ebdScopeFromUser } from "@/lib/ebd-scope";
 import { getBirthdays } from "@/services/ebd-lessons.service";
 import { listClasses } from "@/services/ebd.service";
 import { getReportContext } from "@/services/reports.service";
@@ -16,8 +16,7 @@ export async function GET(request: Request) {
   }
 
   const { searchParams } = new URL(request.url);
-  const congregationIds = await scopedCongregationIdsOrNull(scopeFromUser(user));
-  const scope = { churchId: user.churchId, congregationIds };
+  const scope = await ebdScopeFromUser(user);
 
   const monthParam = Number(searchParams.get("month"));
   const month =

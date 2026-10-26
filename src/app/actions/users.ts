@@ -6,6 +6,7 @@ import { requirePermission } from "@/lib/rbac";
 import { scopeFromUser } from "@/lib/scope";
 import {
   createUser,
+  createEbdTeacherUser,
   updateUser,
   toggleUserActive,
   resetUserPassword,
@@ -51,6 +52,7 @@ export async function updateUserAction(
     congregationId?: string | null;
     active?: boolean;
     password?: string;
+    ebdClassIds?: string[];
   }
 ) {
   const user = await requirePermission("usuarios.manage");
@@ -58,6 +60,23 @@ export async function updateUserAction(
     const updated = await updateUser(actorFromSession(user), id, input);
     revalidatePath("/usuarios");
     return { ok: true as const, id: updated.id };
+  } catch (error) {
+    return { ok: false as const, error: (error as Error).message };
+  }
+}
+
+export async function createEbdTeacherUserAction(input: {
+  teacherId: string;
+  email: string;
+  password: string;
+  classIds: string[];
+  active?: boolean;
+}) {
+  const user = await requirePermission("usuarios.manage");
+  try {
+    const created = await createEbdTeacherUser(actorFromSession(user), input);
+    revalidatePath("/usuarios");
+    return { ok: true as const, id: created.id };
   } catch (error) {
     return { ok: false as const, error: (error as Error).message };
   }

@@ -8,9 +8,12 @@ const ROLES: Array<{ name: UserRoleName; description: string }> = [
   { name: "SUPER_ADMIN", description: "Super administrador: acesso total ao sistema" },
   { name: "ADMIN_SEDE", description: "Administrador da sede: gerencia as congregações da própria sede" },
   { name: "ADMIN_CONGREGACAO", description: "Administrador de uma congregação" },
+  { name: "SUPERINTENDENTE_EBD", description: "Superintendente da EBD: gestão completa do módulo EBD" },
   { name: "FINANCEIRO", description: "Responsável pelo financeiro e contabilidade" },
+  { name: "SECRETARIA_EBD", description: "Secretaria da EBD: alunos, classes, lições e chamadas" },
   { name: "SECRETARIA", description: "Secretaria: membros, carteirinhas e cartas" },
   { name: "PASTOR", description: "Pastor: consulta e relatórios" },
+  { name: "PROFESSOR_EBD", description: "Professor da EBD: acesso somente às suas classes" },
   { name: "CONSULTA", description: "Acesso somente leitura" },
 ];
 
@@ -123,6 +126,9 @@ const ROLE_PERMISSIONS: Record<UserRoleName, string[]> = {
     "fechamento.view",
     "auditoria.view",
   ],
+  SUPERINTENDENTE_EBD: [
+    "ebd.view", "ebd.manage", "ebd.attendance", "ebd.reports",
+  ],
   FINANCEIRO: [
     "dashboard.view",
     "igrejas.view",
@@ -142,6 +148,12 @@ const ROLE_PERMISSIONS: Record<UserRoleName, string[]> = {
     "relatorios.view", "relatorios.export",
     "fechamento.view", "fechamento.fechar",
     "auditoria.view",
+  ],
+  SECRETARIA_EBD: [
+    "ebd.view", "ebd.manage", "ebd.attendance", "ebd.reports",
+  ],
+  PROFESSOR_EBD: [
+    "ebd.view", "ebd.attendance", "ebd.reports",
   ],
   SECRETARIA: [
     "dashboard.view",

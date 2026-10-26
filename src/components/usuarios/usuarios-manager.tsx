@@ -2,8 +2,17 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { KeyRound, Loader2, Pencil, Plus, Power, UserRound } from "lucide-react";
 import {
+  GraduationCap,
+  KeyRound,
+  Loader2,
+  Pencil,
+  Plus,
+  Power,
+  UserRound,
+} from "lucide-react";
+import {
+  createEbdTeacherUserAction,
   createUserAction,
   updateUserAction,
   toggleUserActiveAction,
@@ -59,6 +68,7 @@ type FormState = {
   password: string;
   passwordConfirm: string;
   active: boolean;
+  ebdClassIds: string[];
 };
 
 const EMPTY_FORM: FormState = {
@@ -70,6 +80,25 @@ const EMPTY_FORM: FormState = {
   password: "",
   passwordConfirm: "",
   active: true,
+  ebdClassIds: [],
+};
+
+type TeacherFormState = {
+  teacherId: string;
+  email: string;
+  password: string;
+  passwordConfirm: string;
+  active: boolean;
+  classIds: string[];
+};
+
+const EMPTY_TEACHER_FORM: TeacherFormState = {
+  teacherId: "",
+  email: "",
+  password: "",
+  passwordConfirm: "",
+  active: true,
+  classIds: [],
 };
 
 function formatDate(value: string | null): string {
@@ -100,8 +129,41 @@ export function UsuariosManager({
   const [resetTarget, setResetTarget] = useState<UserListItem | null>(null);
   const [resetPassword, setResetPassword] = useState("");
 
+  const [teacherDialogOpen, setTeacherDialogOpen] = useState(false);
+  const [teacherForm, setTeacherForm] =
+    useState<TeacherFormState>(EMPTY_TEACHER_FORM);
+
   const isCreate = editing === null;
   const isSelfEdit = editing !== null && editing.id === currentUserId;
+  const isEbdTeacherEdit = editing?.ebdTeacher != null;
+
+  const availableTeachers = useMemo(
+    () => managerData.ebdTeachers.filter((t) => t.active && !t.hasUser),
+    [managerData.ebdTeachers]
+  );
+
+  const selectedTeacher = useMemo(
+    () =>
+      managerData.ebdTeachers.find((t) => t.id === teacherForm.teacherId) ??
+      null,
+    [managerData.ebdTeachers, teacherForm.teacherId]
+  );
+
+  const teacherClassOptions = useMemo(() => {
+    if (selectedTeacher) {
+      return managerData.ebdClasses.filter(
+        (c) => c.congregationId === selectedTeacher.congregationId
+      );
+    }
+    return [];
+  }, [managerData.ebdClasses, selectedTeacher]);
+
+  const editClassOptions = useMemo(() => {
+    if (!editing?.congregationId) return [];
+    return managerData.ebdClasses.filter(
+      (c) => c.congregationId === editing.congregationId
+    );
+  }, [managerData.ebdClasses, editing]);
 
   const filteredCongregations = useMemo(
     () =>
@@ -127,10 +189,11 @@ export function UsuariosManager({
   function openEdit(row: UserListItem) {
     setEditing(row);
     setError(null);
-    const selectedRoleId =
-      row.roleIds.find((id) =>
-        managerData.roles.some((r) => r.id === id)
-      ) ?? managerData.roles[0]?.id ?? "";
+    const selectedRoleId = row.ebdTeacher
+      ? managerData.professorRoleId ?? ""
+      : row.roleIds.find((id) => managerData.roles.some((r) => r.id === id)) ??
+        managerData.roles[0]?.id ??
+        "";
     const selectedSede =
       row.sedeId ??
       managerData.sedes.find((s) =>
@@ -149,6 +212,7 @@ export function UsuariosManager({
       password: "",
       passwordConfirm: "",
       active: row.active,
+      ebdClassIds: row.ebdTeacher?.classes.map((c) => c.id) ?? [],
     });
     setDialogOpen(true);
   }
@@ -204,6 +268,7 @@ export function UsuariosManager({
         congregationId: isSelfEdit ? undefined : form.congregationId || null,
         active: isSelfEdit ? undefined : form.active,
         password: form.password || undefined,
+        ebdClassIds: isEbdTeacherEdit ? form.ebdClassIds : undefined,
       });
       setBusy(false);
       if (!result.ok) {
@@ -248,6 +313,89 @@ export function UsuariosManager({
     router.refresh();
   }
 
+  function openTeacherCreate() {
+    setError(null);
+    setTeacherForm(EMPTY_TEACHER_FORM);
+    setTeacherDialogOpen(true);
+  }
+
+  function selectTeacher(teacherId: string) {
+    const teacher =
+      managerData.ebdTeachers.find((t) => t.id === teacherId) ?? null;
+    setTeacherForm((current) => ({
+      ...current,
+      teacherId,
+      email: teacher?.email ?? "",
+      classIds: teacher?.classes.map((c) => c.id) ?? [],
+    }));
+  }
+
+  function toggleTeacherClass(classId: string) {
+    setTeacherForm((current) => ({
+      ...current,
+      classIds: current.classIds.includes(classId)
+        ? current.classIds.filter((id) => id !== classId)
+        : [...current.classIds, classId],
+    }));
+  }
+
+  function toggleFormClass(classId: string) {
+    setForm((current) => ({
+      ...current,
+      ebdClassIds: current.ebdClassIds.includes(classId)
+        ? current.ebdClassIds.filter((id) => id !== classId)
+        : [...current.ebdClassIds, classId],
+    }));
+  }
+
+  async function handleTeacherSubmit() {
+    setBusy(true);
+    setError(null);
+
+    if (!teacherForm.teacherId) {
+      setError("Selecione o professor da EBD.");
+      setBusy(false);
+      return;
+    }
+    if (!teacherForm.email.trim()) {
+      setError("Informe o e-mail de acesso do professor.");
+      setBusy(false);
+      return;
+    }
+    if (teacherForm.password !== teacherForm.passwordConfirm) {
+      setError("A senha e a confirmação não conferem.");
+      setBusy(false);
+      return;
+    }
+    if (teacherForm.password.length < 6) {
+      setError("A senha deve ter no mínimo 6 caracteres.");
+      setBusy(false);
+      return;
+    }
+    if (teacherForm.classIds.length === 0) {
+      setError("Selecione pelo menos uma classe para o professor.");
+      setBusy(false);
+      return;
+    }
+
+    const result = await createEbdTeacherUserAction({
+      teacherId: teacherForm.teacherId,
+      email: teacherForm.email.trim(),
+      password: teacherForm.password,
+      classIds: teacherForm.classIds,
+      active: teacherForm.active,
+    });
+    setBusy(false);
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+
+    setTeacherDialogOpen(false);
+    setTeacherForm(EMPTY_TEACHER_FORM);
+    router.refresh();
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -257,14 +405,25 @@ export function UsuariosManager({
           </h1>
           <p className="text-sm text-muted-foreground">
             Acessos ao sistema com e-mail, senha e permissões por sede e
-            congregação
+            congregação. Professores da EBD acessam somente o módulo EBD e as
+            classes vinculadas.
           </p>
         </div>
         {canManage && (
-          <Button onClick={openCreate} className="w-full shrink-0 sm:w-auto">
-            <Plus className="mr-2 h-4 w-4" />
-            Novo usuário
-          </Button>
+          <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row">
+            <Button
+              variant="outline"
+              onClick={openTeacherCreate}
+              className="w-full sm:w-auto"
+            >
+              <GraduationCap className="mr-2 h-4 w-4" />
+              Novo professor EBD
+            </Button>
+            <Button onClick={openCreate} className="w-full sm:w-auto">
+              <Plus className="mr-2 h-4 w-4" />
+              Novo usuário
+            </Button>
+          </div>
         )}
       </div>
 
@@ -309,6 +468,14 @@ export function UsuariosManager({
                     {ROLE_LABELS[r] ?? r}
                   </Badge>
                 ))}
+                {row.ebdTeacher && (
+                  <Badge variant="secondary">
+                    EBD:{" "}
+                    {row.ebdTeacher.classes.length > 0
+                      ? row.ebdTeacher.classes.map((c) => c.name).join(", ")
+                      : "sem classe"}
+                  </Badge>
+                )}
                 {row.id === currentUserId && (
                   <Badge variant="secondary">Você</Badge>
                 )}
@@ -422,6 +589,16 @@ export function UsuariosManager({
                           {ROLE_LABELS[r] ?? r}
                         </Badge>
                       ))}
+                      {row.ebdTeacher && (
+                        <Badge variant="secondary">
+                          EBD:{" "}
+                          {row.ebdTeacher.classes.length > 0
+                            ? row.ebdTeacher.classes
+                                .map((c) => c.name)
+                                .join(", ")
+                            : "sem classe"}
+                        </Badge>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell>{row.sedeName ?? "—"}</TableCell>
@@ -517,29 +694,39 @@ export function UsuariosManager({
 
             <div className="space-y-1">
               <Label>Papel / perfil de acesso</Label>
-              <Select
-                value={form.roleId}
-                disabled={isSelfEdit}
-                onValueChange={(v) => setField("roleId", v)}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Selecione o papel" />
-                </SelectTrigger>
-                <SelectContent>
-                  {managerData.roles.map((r) => (
-                    <SelectItem key={r.id} value={r.id}>
-                      {r.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {isEbdTeacherEdit ? (
+                <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">
+                  <p className="font-medium">Professor da EBD</p>
+                  <p className="text-xs text-muted-foreground">
+                    Acesso restrito ao módulo EBD e às classes selecionadas
+                    abaixo.
+                  </p>
+                </div>
+              ) : (
+                <Select
+                  value={form.roleId}
+                  disabled={isSelfEdit}
+                  onValueChange={(v) => setField("roleId", v)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Selecione o papel" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {managerData.roles.map((r) => (
+                      <SelectItem key={r.id} value={r.id}>
+                        {r.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
             <div className="space-y-1">
               <Label>Sede</Label>
               <Select
                 value={form.sedeId}
-                disabled={isSelfEdit || managerData.sedes.length === 0}
+                disabled={isSelfEdit || isEbdTeacherEdit || managerData.sedes.length === 0}
                 onValueChange={(v) =>
                   setForm((f) => {
                     const next = { ...f, sedeId: v };
@@ -578,7 +765,11 @@ export function UsuariosManager({
               </Label>
               <Select
                 value={form.congregationId || "none"}
-                disabled={isSelfEdit || filteredCongregations.length === 0}
+                disabled={
+                  isSelfEdit ||
+                  isEbdTeacherEdit ||
+                  filteredCongregations.length === 0
+                }
                 onValueChange={(v) =>
                   setField(
                     "congregationId",
@@ -602,6 +793,37 @@ export function UsuariosManager({
                 Ao escolher uma congregação, o acesso fica restrito a ela.
               </p>
             </div>
+
+            {isEbdTeacherEdit && (
+              <div className="space-y-1">
+                <Label>Classes da EBD</Label>
+                <p className="text-xs text-muted-foreground">
+                  O professor verá somente estas classes dentro do módulo EBD.
+                </p>
+                {editClassOptions.length === 0 ? (
+                  <p className="rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+                    Nenhuma classe da EBD cadastrada para esta congregação.
+                  </p>
+                ) : (
+                  <div className="grid max-h-44 gap-2 overflow-y-auto rounded-lg border p-2 sm:grid-cols-2">
+                    {editClassOptions.map((item) => (
+                      <label
+                        key={item.id}
+                        className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/50"
+                      >
+                        <input
+                          type="checkbox"
+                          className="size-4 rounded border-input accent-primary"
+                          checked={form.ebdClassIds.includes(item.id)}
+                          onChange={() => toggleFormClass(item.id)}
+                        />
+                        <span className="min-w-0 truncate">{item.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1">
@@ -653,6 +875,177 @@ export function UsuariosManager({
             <Button onClick={handleSubmit} disabled={busy}>
               {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={teacherDialogOpen} onOpenChange={setTeacherDialogOpen}>
+        <DialogContent className="max-h-[85dvh] overflow-y-auto max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Novo professor EBD</DialogTitle>
+            <DialogDescription>
+              Crie o acesso de um professor já cadastrado na EBD. Ele poderá
+              entrar somente no módulo EBD e ver apenas as classes selecionadas.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {availableTeachers.length === 0 ? (
+              <p className="rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+                Todos os professores ativos da EBD já possuem acesso ao sistema.
+                Para cadastrar um novo professor, use o módulo EBD → Professores.
+              </p>
+            ) : (
+              <>
+                <div className="space-y-1">
+                  <Label>Professor da EBD</Label>
+                  <Select
+                    value={teacherForm.teacherId}
+                    onValueChange={selectTeacher}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Selecione o professor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableTeachers.map((teacher) => (
+                        <SelectItem key={teacher.id} value={teacher.id}>
+                          {teacher.name} · {teacher.congregationName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {selectedTeacher && (
+                  <>
+                    <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">
+                      <p className="font-medium">{selectedTeacher.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Matrícula {selectedTeacher.code} ·{" "}
+                        {selectedTeacher.congregationName}
+                      </p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label>Classes da EBD</Label>
+                      <p className="text-xs text-muted-foreground">
+                        O professor verá somente estas classes dentro do módulo
+                        EBD.
+                      </p>
+                      {teacherClassOptions.length === 0 ? (
+                        <p className="rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+                          Nenhuma classe da EBD cadastrada para esta congregação.
+                        </p>
+                      ) : (
+                        <div className="grid max-h-44 gap-2 overflow-y-auto rounded-lg border p-2 sm:grid-cols-2">
+                          {teacherClassOptions.map((item) => (
+                            <label
+                              key={item.id}
+                              className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/50"
+                            >
+                              <input
+                                type="checkbox"
+                                className="size-4 rounded border-input accent-primary"
+                                checked={teacherForm.classIds.includes(item.id)}
+                                onChange={() => toggleTeacherClass(item.id)}
+                              />
+                              <span className="min-w-0 truncate">
+                                {item.name}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label htmlFor="ebd-email">E-mail de acesso</Label>
+                      <Input
+                        id="ebd-email"
+                        type="email"
+                        value={teacherForm.email}
+                        onChange={(e) =>
+                          setTeacherForm((current) => ({
+                            ...current,
+                            email: e.target.value,
+                          }))
+                        }
+                        placeholder="professor@igreja.com.br"
+                      />
+                    </div>
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-1">
+                        <Label htmlFor="ebd-senha">Senha</Label>
+                        <Input
+                          id="ebd-senha"
+                          type="password"
+                          value={teacherForm.password}
+                          onChange={(e) =>
+                            setTeacherForm((current) => ({
+                              ...current,
+                              password: e.target.value,
+                            }))
+                          }
+                          placeholder="Mínimo 6 caracteres"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="ebd-senha2">Confirmar senha</Label>
+                        <Input
+                          id="ebd-senha2"
+                          type="password"
+                          value={teacherForm.passwordConfirm}
+                          onChange={(e) =>
+                            setTeacherForm((current) => ({
+                              ...current,
+                              passwordConfirm: e.target.value,
+                            }))
+                          }
+                          placeholder="Repita a senha"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between rounded-md border px-3 py-2">
+                      <div>
+                        <p className="text-sm font-medium">Acesso ativo</p>
+                        <p className="text-xs text-muted-foreground">
+                          O professor pode entrar no sistema
+                        </p>
+                      </div>
+                      <Switch
+                        checked={teacherForm.active}
+                        onCheckedChange={(v) =>
+                          setTeacherForm((current) => ({
+                            ...current,
+                            active: v,
+                          }))
+                        }
+                      />
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+
+            <p className="text-sm text-destructive">{error}</p>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setTeacherDialogOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleTeacherSubmit}
+              disabled={busy || availableTeachers.length === 0}
+            >
+              {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Criar acesso
             </Button>
           </DialogFooter>
         </DialogContent>

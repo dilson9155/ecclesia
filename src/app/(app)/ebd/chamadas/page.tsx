@@ -1,5 +1,5 @@
 import { requirePermission, can } from "@/lib/rbac";
-import { scopeFromUser, scopedCongregationIdsOrNull } from "@/lib/scope";
+import { ebdScopeFromUser } from "@/lib/ebd-scope";
 import { listClasses } from "@/services/ebd.service";
 import {
   listAttendances,
@@ -18,8 +18,7 @@ export default async function EbdAttendancePage({ searchParams }: Props) {
   const user = await requirePermission("ebd.view");
   if (!user.churchId) return null;
 
-  const congregationIds = await scopedCongregationIdsOrNull(scopeFromUser(user));
-  const scope = { churchId: user.churchId, congregationIds };
+  const scope = await ebdScopeFromUser(user);
 
   const [attendances, lessons, classes, quarters] = await Promise.all([
     listAttendances(scope),

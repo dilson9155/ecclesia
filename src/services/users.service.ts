@@ -34,16 +34,45 @@ export type UserListItem = {
   congregationName: string | null;
   roles: string[];
   roleIds: string[];
+  ebdTeacher: {
+    id: string;
+    active: boolean;
+    classes: Array<{ id: string; name: string }>;
+  } | null;
 };
 
 export type Option = { value: string; label: string };
 
 export type CongregationOption = Option & { sedeId: string };
 
+export type EbdTeacherOption = {
+  id: string;
+  memberId: string;
+  name: string;
+  email: string | null;
+  code: string;
+  congregationId: string;
+  congregationName: string;
+  active: boolean;
+  hasUser: boolean;
+  classes: Array<{ id: string; name: string }>;
+};
+
+export type EbdClassOption = {
+  id: string;
+  name: string;
+  congregationId: string;
+  congregationName: string;
+  status: "ATIVO" | "INATIVO";
+};
+
 export type ManagerData = {
   sedes: Option[];
   congregations: CongregationOption[];
   roles: { id: string; name: string; label: string }[];
+  professorRoleId: string | null;
+  ebdTeachers: EbdTeacherOption[];
+  ebdClasses: EbdClassOption[];
 };
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -163,6 +192,33 @@ function assertAssignableRole(actor: UserActor, roleName: string): void {
   }
 }
 
+async function resolveTeacherClassIds(
+  actor: UserActor,
+  classIds: string[]
+): Promise<string[]> {
+  const churchId = actor.scope.churchId;
+  if (!churchId) throw new Error("Nenhuma igreja vinculada ao seu usuário.");
+
+  const unique = Array.from(new Set((classIds ?? []).filter(Boolean)));
+  if (unique.length === 0) {
+    throw new Error("Selecione pelo menos uma classe para o professor.");
+  }
+
+  const classes = await prisma.ebdClass.findMany({
+    where: { id: { in: unique }, churchId },
+    select: { id: true, congregationId: true },
+  });
+  if (classes.length !== unique.length) {
+    throw new Error("Uma das classes selecionadas não foi encontrada.");
+  }
+
+  for (const item of classes) {
+    await assertCongregationInScope(actor.scope, item.congregationId);
+  }
+
+  return classes.map((item) => item.id);
+}
+
 export async function listUsers(
   actor: UserActor
 ): Promise<UserListItem[]> {
@@ -188,6 +244,11 @@ export async function listUsers(
       roles: { include: { role: true } },
       sede: { select: { id: true, name: true } },
       congregation: { select: { id: true, name: true } },
+      ebdTeacher: {
+        include: {
+          classes: { include: { class: { select: { id: true, name: true } } } },
+        },
+      },
     },
     orderBy: [{ name: "asc" }],
   });
@@ -205,13 +266,29 @@ export async function listUsers(
     congregationName: u.congregation?.name ?? null,
     roles: u.roles.map((ur) => ur.role.name),
     roleIds: u.roles.map((ur) => ur.role.id),
+    ebdTeacher: u.ebdTeacher
+      ? {
+          id: u.ebdTeacher.id,
+          active: u.ebdTeacher.active,
+          classes: u.ebdTeacher.classes
+            .map((link) => ({ id: link.class.id, name: link.class.name }))
+            .sort((a, b) => a.name.localeCompare(b.name)),
+        }
+      : null,
   }));
 }
 
 export async function loadManagerData(actor: UserActor): Promise<ManagerData> {
   const churchId = actor.scope.churchId;
   if (!churchId) {
-    return { sedes: [], congregations: [], roles: [] };
+    return {
+      sedes: [],
+      congregations: [],
+      roles: [],
+      professorRoleId: null,
+      ebdTeachers: [],
+      ebdClasses: [],
+    };
   }
 
   const sedes = await prisma.sede.findMany({
@@ -255,6 +332,7 @@ export async function loadManagerData(actor: UserActor): Promise<ManagerData> {
   const roles = allRoles
     .filter((r) => {
       const name = r.name as UserRoleName;
+      if (name === "PROFESSOR_EBD") return false;
       if (actor.roles.includes("SUPER_ADMIN")) return true;
       return ROLE_RANK[name] < actorRank;
     })
@@ -265,10 +343,115 @@ export async function loadManagerData(actor: UserActor): Promise<ManagerData> {
     )
     .map((r) => ({ id: r.id, name: r.name as string, label: roleLabel(r.name) }));
 
+  const professorRoleId =
+    allRoles.find((role) => role.name === "PROFESSOR_EBD")?.id ?? null;
+
+  const allowedCongregations = superAdminAll
+    ? null
+    : new Set(congregationIds);
+
+  const [ebdTeacherRows, ebdClassRows] = await Promise.all([
+    prisma.ebdTeacher.findMany({
+      where: {
+        churchId,
+        ...(superAdminAll
+          ? {}
+          : {
+              member: {
+                congregationId: {
+                  in:
+                    congregationIds.length > 0
+                      ? congregationIds
+                      : ["__none__"],
+                },
+              },
+            }),
+      },
+      include: {
+        member: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            code: true,
+            congregationId: true,
+            congregation: { select: { name: true } },
+          },
+        },
+        classes: {
+          include: {
+            class: {
+              select: {
+                id: true,
+                name: true,
+                congregationId: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: [{ active: "desc" }, { member: { name: "asc" } }],
+    }),
+    prisma.ebdClass.findMany({
+      where: {
+        churchId,
+        ...(superAdminAll
+          ? {}
+          : {
+              congregationId: {
+                in:
+                  congregationIds.length > 0
+                    ? congregationIds
+                    : ["__none__"],
+              },
+            }),
+      },
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        congregationId: true,
+        congregation: { select: { name: true } },
+      },
+      orderBy: [{ name: "asc" }],
+    }),
+  ]);
+
+  const ebdTeachers: EbdTeacherOption[] = ebdTeacherRows.map((teacher) => ({
+    id: teacher.id,
+    memberId: teacher.memberId,
+    name: teacher.member.name,
+    email: teacher.member.email,
+    code: teacher.member.code,
+    congregationId: teacher.member.congregationId,
+    congregationName: teacher.member.congregation.name,
+    active: teacher.active,
+    hasUser: Boolean(teacher.userId),
+    classes: teacher.classes
+      .filter(
+        (link) =>
+          !allowedCongregations ||
+          allowedCongregations.has(link.class.congregationId)
+      )
+      .map((link) => ({ id: link.class.id, name: link.class.name }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
+  }));
+
+  const ebdClasses: EbdClassOption[] = ebdClassRows.map((item) => ({
+    id: item.id,
+    name: item.name,
+    congregationId: item.congregationId,
+    congregationName: item.congregation.name,
+    status: item.status,
+  }));
+
   return {
     sedes: sedeOptions,
     congregations: congregationOptions,
     roles,
+    professorRoleId,
+    ebdTeachers,
+    ebdClasses,
   };
 }
 
@@ -300,6 +483,11 @@ export async function createUser(
     select: { id: true, name: true, active: true },
   });
   if (!role || !role.active) throw new Error("Papel inválido ou inativo.");
+  if (role.name === "PROFESSOR_EBD") {
+    throw new Error(
+      'Para criar o acesso de um professor da EBD, use o botão "Novo professor EBD".'
+    );
+  }
   assertAssignableRole(actor, role.name as UserRoleName);
 
   const scoped = await resolveTargetScope(actor, role.name, {
@@ -348,6 +536,7 @@ export async function updateUser(
     congregationId?: string | null;
     active?: boolean;
     password?: string;
+    ebdClassIds?: string[];
   }
 ): Promise<{ id: string }> {
   const churchId = actor.scope.churchId;
@@ -355,7 +544,10 @@ export async function updateUser(
 
   const target = await prisma.user.findUnique({
     where: { id },
-    include: { roles: { include: { role: true } } },
+    include: {
+      roles: { include: { role: true } },
+      ebdTeacher: { select: { id: true } },
+    },
   });
   if (!target) throw new Error("Usuário não encontrado.");
   assertUserInScope(target, actor.scope);
@@ -401,6 +593,21 @@ export async function updateUser(
     assertAssignableRole(actor, namedRole.name as UserRoleName);
   }
 
+  const nextRoleName = (namedRole?.name ?? targetRoles[0]) as string;
+  if (nextRoleName === "PROFESSOR_EBD" && !target.ebdTeacher) {
+    throw new Error(
+      'Este usuário não está vinculado a um professor da EBD. Crie o acesso pelo botão "Novo professor EBD".'
+    );
+  }
+
+  let ebdClassIds: string[] | null = null;
+  if (input.ebdClassIds !== undefined) {
+    if (!target.ebdTeacher) {
+      throw new Error("Este usuário não está vinculado a um professor da EBD.");
+    }
+    ebdClassIds = await resolveTeacherClassIds(actor, input.ebdClassIds);
+  }
+
   const basicData: {
     name: string;
     email: string;
@@ -422,7 +629,6 @@ export async function updateUser(
   }
 
   if (!isSelf) {
-    const nextRoleName = (namedRole?.name ?? targetRoles[0]) as string;
     const scoped = await resolveTargetScope(actor, nextRoleName, {
       sedeId: input.sedeId ?? target.sedeId,
       congregationId: input.congregationId ?? target.congregationId,
@@ -439,6 +645,19 @@ export async function updateUser(
         data: { userId: target.id, roleId: namedRole.id },
       });
     }
+    if (ebdClassIds !== null && target.ebdTeacher) {
+      await tx.ebdTeacherClass.deleteMany({
+        where: { teacherId: target.ebdTeacher.id },
+      });
+      if (ebdClassIds.length > 0) {
+        await tx.ebdTeacherClass.createMany({
+          data: ebdClassIds.map((classId) => ({
+            teacherId: target.ebdTeacher!.id,
+            classId,
+          })),
+        });
+      }
+    }
   });
 
   await auditLog({
@@ -451,6 +670,120 @@ export async function updateUser(
     description: `Usuário atualizado: ${name} (${email})`,
   });
   return { id: target.id };
+}
+
+export async function createEbdTeacherUser(
+  actor: UserActor,
+  input: {
+    teacherId: string;
+    email: string;
+    password: string;
+    classIds: string[];
+    active?: boolean;
+  }
+): Promise<{ id: string }> {
+  const churchId = actor.scope.churchId;
+  if (!churchId) throw new Error("Nenhuma igreja vinculada ao seu usuário.");
+
+  const email = normalizeEmail(input.email);
+  if (!EMAIL_RE.test(email)) throw new Error("E-mail inválido.");
+  if (input.password.length < 6) {
+    throw new Error("A senha deve ter no mínimo 6 caracteres.");
+  }
+
+  const teacher = await prisma.ebdTeacher.findFirst({
+    where: { id: input.teacherId, churchId, userId: null },
+    include: {
+      member: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          code: true,
+          sedeId: true,
+          congregationId: true,
+          congregation: { select: { name: true } },
+        },
+      },
+    },
+  });
+  if (!teacher) {
+    throw new Error(
+      "Professor da EBD não encontrado ou já possui acesso ao sistema."
+    );
+  }
+  if (!teacher.active) {
+    throw new Error("Este professor está inativo na EBD.");
+  }
+
+  assertUserInScope(
+    {
+      sedeId: teacher.member.sedeId,
+      congregationId: teacher.member.congregationId,
+    },
+    actor.scope
+  );
+
+  const role = await prisma.role.findUnique({
+    where: { name: "PROFESSOR_EBD" },
+    select: { id: true, name: true, active: true },
+  });
+  if (!role || !role.active) {
+    throw new Error(
+      "O perfil Professor da EBD não está configurado. Execute o seed do sistema."
+    );
+  }
+  assertAssignableRole(actor, role.name);
+
+  if (await emailTaken(email)) {
+    throw new Error("Já existe um usuário com este e-mail.");
+  }
+
+  const classIds = await resolveTeacherClassIds(actor, input.classIds);
+  const passwordHash = await bcrypt.hash(input.password, 12);
+
+  const created = await prisma.$transaction(async (tx) => {
+    const user = await tx.user.create({
+      data: {
+        churchId,
+        sedeId: teacher.member.sedeId,
+        congregationId: teacher.member.congregationId,
+        name: teacher.member.name,
+        email,
+        passwordHash,
+        active: input.active !== false,
+        roles: { create: { roleId: role.id } },
+      },
+    });
+
+    await tx.ebdTeacherClass.deleteMany({
+      where: { teacherId: teacher.id },
+    });
+    await tx.ebdTeacher.update({
+      where: { id: teacher.id },
+      data: {
+        userId: user.id,
+        classes: {
+          create: classIds.map((classId) => ({ classId })),
+        },
+      },
+    });
+
+    return user;
+  });
+
+  await auditLog({
+    userId: actor.userId,
+    churchId,
+    action: "CREATE",
+    module: "usuarios",
+    entity: "User",
+    entityId: created.id,
+    description: `Acesso de professor da EBD criado: ${teacher.member.name} (${email}) — ${teacher.member.congregation.name}`,
+    newValues: { teacherId: teacher.id, classIds },
+  });
+
+  return { id: created.id };
 }
 
 export async function toggleUserActive(

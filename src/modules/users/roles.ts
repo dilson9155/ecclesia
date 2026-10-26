@@ -2,9 +2,12 @@ export const ROLE_ORDER = [
   "SUPER_ADMIN",
   "ADMIN_SEDE",
   "ADMIN_CONGREGACAO",
+  "SUPERINTENDENTE_EBD",
   "FINANCEIRO",
+  "SECRETARIA_EBD",
   "SECRETARIA",
   "PASTOR",
+  "PROFESSOR_EBD",
   "CONSULTA",
 ] as const;
 
@@ -14,9 +17,12 @@ export const ROLE_LABELS: Record<string, string> = {
   SUPER_ADMIN: "Super Administrador",
   ADMIN_SEDE: "Administrador da Sede",
   ADMIN_CONGREGACAO: "Administrador da Congregação",
+  SUPERINTENDENTE_EBD: "Superintendente da EBD",
   FINANCEIRO: "Financeiro",
+  SECRETARIA_EBD: "Secretaria da EBD",
   SECRETARIA: "Secretaria",
   PASTOR: "Pastor",
+  PROFESSOR_EBD: "Professor da EBD",
   CONSULTA: "Consulta",
 };
 
@@ -24,9 +30,12 @@ export const ROLE_RANK: Record<string, number> = {
   SUPER_ADMIN: 6,
   ADMIN_SEDE: 5,
   ADMIN_CONGREGACAO: 4,
+  SUPERINTENDENTE_EBD: 3,
   FINANCEIRO: 3,
+  SECRETARIA_EBD: 2,
   SECRETARIA: 2,
   PASTOR: 1,
+  PROFESSOR_EBD: 1,
   CONSULTA: 0,
 };
 

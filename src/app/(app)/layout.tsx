@@ -8,7 +8,7 @@ type NavEntry = NavItem & { permission?: string };
 const NAV_GROUPS: Array<{ title?: string; items: NavEntry[] }> = [
   {
     items: [
-      { key: "dashboard", label: "Dashboard", href: "/dashboard", icon: "dashboard" },
+      { key: "dashboard", label: "Dashboard", href: "/dashboard", icon: "dashboard", permission: "dashboard.view" },
     ],
   },
   {
