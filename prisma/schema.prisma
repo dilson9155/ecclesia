@@ -198,6 +198,12 @@ model Church {
   auditLogs       AuditLog[]
   systemSettings  SystemSetting[]
 
+  ebdClasses     EbdClass[]
+  ebdStudents    EbdStudent[]
+  ebdTeachers    EbdTeacher[]
+  ebdQuarters    EbdQuarter[]
+  ebdAttendances EbdAttendance[]
+
   @@map("churches")
 }
 
@@ -308,6 +314,8 @@ model Congregation {
   closings        FinancialClosing[]
   users           User[]
 
+  ebdClasses EbdClass[]
+
   @@unique([sedeId, code])
   @@unique([sedeId, name])
   @@index([churchId, status])
@@ -348,6 +356,7 @@ model User {
   documents               Document[]
   closingsClosed          FinancialClosing[]   @relation("ClosingClosedBy")
   closingsReopened        FinancialClosing[]   @relation("ClosingReopenedBy")
+  ebdAttendances          EbdAttendance[]
 
   @@index([churchId])
   @@index([sedeId])
@@ -456,11 +465,13 @@ model Member {
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
-  tithes    Tithe[]
-  offerings Offering[]
-  cards     MembershipCard[]
-  documents Document[]
-  visitor   Visitor[]
+  tithes     Tithe[]
+  offerings  Offering[]
+  cards      MembershipCard[]
+  documents  Document[]
+  visitor    Visitor[]
+  ebdStudent EbdStudent?
+  ebdTeacher EbdTeacher?
 
   @@unique([congregationId, code])
   @@index([churchId, situation])
@@ -944,4 +955,182 @@ model PlatformNotice {
 
   @@index([active, publishedAt])
   @@map("platform_notices")
+}
+
+// ---------------------------------------------------------------------------
+// EBD — Escola Bíblica Dominical
+// ---------------------------------------------------------------------------
+
+enum EbdQuarterStatus {
+  ABERTO
+  FECHADO
+}
+
+/// Classe da EBD (turma). Agrupa alunos, professores e lições.
+model EbdClass {
+  id             String        @id @default(cuid())
+  churchId       String
+  church         Church        @relation(fields: [churchId], references: [id], onDelete: Restrict)
+  congregationId String
+  congregation   Congregation  @relation(fields: [congregationId], references: [id], onDelete: Restrict)
+  name           String
+  description    String?
+  ageRange       String?
+  /// Capacidade máxima de alunos da classe.
+  maxStudents    Int           @default(30)
+  status         GenericStatus @default(ATIVO)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  students    EbdStudent[]
+  teachers    EbdTeacherClass[]
+  lessons     EbdLesson[]
+  attendances EbdAttendance[]
+
+  @@unique([congregationId, name])
+  @@index([churchId, status])
+  @@map("ebd_classes")
+}
+
+/// Aluno da EBD: vínculo entre um membro já cadastrado e uma classe.
+model EbdStudent {
+  id         String   @id @default(cuid())
+  churchId   String
+  church     Church   @relation(fields: [churchId], references: [id], onDelete: Restrict)
+  memberId   String   @unique
+  member     Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  classId    String
+  class      EbdClass @relation(fields: [classId], references: [id], onDelete: Restrict)
+  /// Chave que ativa/inativa o aluno na EBD.
+  active     Boolean  @default(true)
+  enrolledAt DateTime @default(now())
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  entries EbdAttendanceEntry[]
+
+  @@index([classId, active])
+  @@index([churchId, active])
+  @@map("ebd_students")
+}
+
+/// Professor da EBD. As classes em que pode lecionar ficam em EbdTeacherClass.
+model EbdTeacher {
+  id        String   @id @default(cuid())
+  churchId  String
+  church    Church   @relation(fields: [churchId], references: [id], onDelete: Restrict)
+  memberId  String   @unique
+  member    Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  active    Boolean  @default(true)
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  classes EbdTeacherClass[]
+
+  @@index([churchId, active])
+  @@map("ebd_teachers")
+}
+
+model EbdTeacherClass {
+  id        String     @id @default(cuid())
+  teacherId String
+  teacher   EbdTeacher @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  classId   String
+  class     EbdClass   @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  @@unique([teacherId, classId])
+  @@index([classId])
+  @@map("ebd_teacher_classes")
+}
+
+/// Trimestre da EBD. Agrupa as lições do período.
+model EbdQuarter {
+  id        String           @id @default(cuid())
+  churchId  String
+  church    Church           @relation(fields: [churchId], references: [id], onDelete: Restrict)
+  name      String
+  startDate DateTime
+  endDate   DateTime
+  status    EbdQuarterStatus @default(ABERTO)
+  notes     String?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  lessons     EbdLesson[]
+  attendances EbdAttendance[]
+
+  @@index([churchId, startDate])
+  @@map("ebd_quarters")
+}
+
+/// Lição do trimestre, identificada pelo número dentro da classe.
+model EbdLesson {
+  id        String     @id @default(cuid())
+  quarterId String
+  quarter   EbdQuarter @relation(fields: [quarterId], references: [id], onDelete: Cascade)
+  classId   String
+  class     EbdClass   @relation(fields: [classId], references: [id], onDelete: Restrict)
+  number    Int
+  title     String
+  notes     String?    @db.Text
+  date      DateTime?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  attendances EbdAttendance[]
+
+  @@unique([quarterId, classId, number])
+  @@index([classId])
+  @@map("ebd_lessons")
+}
+
+/// Chamada realizada em uma lição (uma por domingo).
+model EbdAttendance {
+  id          String     @id @default(cuid())
+  churchId    String
+  church      Church     @relation(fields: [churchId], references: [id], onDelete: Restrict)
+  lessonId    String
+  lesson      EbdLesson  @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  quarterId   String
+  quarter     EbdQuarter @relation(fields: [quarterId], references: [id], onDelete: Cascade)
+  classId     String
+  class       EbdClass   @relation(fields: [classId], references: [id], onDelete: Restrict)
+  date        DateTime
+  notes       String?    @db.Text
+  createdById String?
+  createdBy   User?      @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  entries EbdAttendanceEntry[]
+
+  @@index([classId, date])
+  @@index([quarterId, date])
+  @@index([churchId, date])
+  @@map("ebd_attendances")
+}
+
+/// Pontuação de um aluno em uma chamada.
+model EbdAttendanceEntry {
+  id                 String        @id @default(cuid())
+  attendanceId       String
+  attendance         EbdAttendance @relation(fields: [attendanceId], references: [id], onDelete: Cascade)
+  studentId          String
+  student            EbdStudent    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  present            Boolean       @default(false)
+  /// Lição impressa (0-2)
+  lessonScore        Int           @default(0)
+  /// Participação (0-3)
+  participationScore Int           @default(0)
+  /// Bíblia impressa (0-2)
+  bibleScore         Int           @default(0)
+  /// Oferta (0-1)
+  offeringScore      Int           @default(0)
+  notes              String?
+
+  @@unique([attendanceId, studentId])
+  @@index([studentId])
+  @@map("ebd_attendance_entries")
 }

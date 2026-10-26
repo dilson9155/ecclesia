@@ -7,6 +7,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Bell,
+  BookOpen,
   Building2,
   BookText,
   CircleDollarSign,
@@ -40,7 +41,7 @@ export type NavItem = {
   key: string;
   label: string;
   href: string;
-  icon?: "dashboard" | "igrejas" | "usuarios" | "membros" | "visitantes" | "carteirinhas" | "cartas" | "financeiro" | "contas" | "centrosCusto" | "dizimos" | "ofertas" | "fornecedores" | "entradas" | "saidas" | "livroCaixa" | "fechamento" | "relatorios" | "cobranca" | "admin";
+  icon?: "dashboard" | "igrejas" | "usuarios" | "membros" | "visitantes" | "carteirinhas" | "cartas" | "financeiro" | "contas" | "centrosCusto" | "dizimos" | "ofertas" | "fornecedores" | "entradas" | "saidas" | "livroCaixa" | "fechamento" | "relatorios" | "cobranca" | "admin" | "ebd";
 };
 
 export type NavGroup = {
@@ -158,6 +159,7 @@ const NAV_ICONS: Record<NonNullable<NavItem["icon"]>, ReactNode> = {
   relatorios: <FileText className="h-4 w-4" />,
   cobranca: <CircleDollarSign className="h-4 w-4" />,
   admin: <Settings className="h-4 w-4" />,
+  ebd: <BookOpen className="h-4 w-4" />,
 };
 
 function Brand() {

@@ -18,6 +18,7 @@ const NAV_GROUPS: Array<{ title?: string; items: NavEntry[] }> = [
       { key: "visitantes", label: "Visitantes", href: "/visitantes", icon: "visitantes", permission: "visitantes.view" },
       { key: "carteirinhas", label: "Carteirinhas", href: "/carteirinhas", icon: "carteirinhas", permission: "carteirinhas.view" },
       { key: "cartas", label: "Cartas", href: "/cartas", icon: "cartas", permission: "cartas.view" },
+      { key: "ebd", label: "EBD", href: "/ebd", icon: "ebd", permission: "ebd.view" },
     ],
   },
   {

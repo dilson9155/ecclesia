@@ -41,6 +41,10 @@ const PERMISSIONS: Array<{ key: string; name: string; group: string }> = [
   { key: "cartas.edit", name: "Editar cartas", group: "Cartas" },
   { key: "cartas.delete", name: "Excluir cartas", group: "Cartas" },
   { key: "cartas.export", name: "Exportar cartas", group: "Cartas" },
+  { key: "ebd.view", name: "Visualizar EBD", group: "EBD" },
+  { key: "ebd.manage", name: "Gerenciar EBD", group: "EBD" },
+  { key: "ebd.attendance", name: "Registrar chamadas da EBD", group: "EBD" },
+  { key: "ebd.reports", name: "Relatórios pedagógicos da EBD", group: "EBD" },
   { key: "dizimos.view", name: "Visualizar dízimos", group: "Dízimos" },
   { key: "dizimos.create", name: "Criar dízimos", group: "Dízimos" },
   { key: "dizimos.edit", name: "Editar dízimos", group: "Dízimos" },
@@ -106,6 +110,7 @@ const ROLE_PERMISSIONS: Record<UserRoleName, string[]> = {
     "visitantes.view", "visitantes.create", "visitantes.edit",
     "carteirinhas.view", "carteirinhas.emit",
     "cartas.view", "cartas.create", "cartas.edit", "cartas.export",
+    "ebd.view", "ebd.manage", "ebd.attendance", "ebd.reports",
     "dizimos.view", "dizimos.create", "dizimos.edit", "dizimos.cancel", "dizimos.estorno",
     "ofertas.view", "ofertas.create", "ofertas.edit", "ofertas.cancel", "ofertas.estorno",
     "entradas.view", "entradas.create", "entradas.edit", "entradas.cancel", "entradas.estorno",
@@ -147,6 +152,7 @@ const ROLE_PERMISSIONS: Record<UserRoleName, string[]> = {
     "visitantes.view", "visitantes.create", "visitantes.edit",
     "carteirinhas.view", "carteirinhas.emit",
     "cartas.view", "cartas.create", "cartas.edit", "cartas.export",
+    "ebd.view", "ebd.manage", "ebd.attendance", "ebd.reports",
     "relatorios.view",
   ],
   PASTOR: [
@@ -167,6 +173,7 @@ const ROLE_PERMISSIONS: Record<UserRoleName, string[]> = {
     "relatorios.view", "relatorios.export",
     "fechamento.view",
     "auditoria.view",
+    "ebd.view", "ebd.reports",
   ],
   CONSULTA: [
     "dashboard.view",
@@ -187,6 +194,7 @@ const ROLE_PERMISSIONS: Record<UserRoleName, string[]> = {
     "livroCaixa.view",
     "relatorios.view",
     "fechamento.view",
+    "ebd.view", "ebd.reports",
   ],
 };
 
