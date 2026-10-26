@@ -774,7 +774,7 @@ export function AttendanceManager({
       {/* Formulário de chamada */}
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
         <DialogContent className="flex max-h-[92dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-4xl">
-          <DialogHeader className="shrink-0 border-b bg-muted/30 px-5 py-4">
+          <DialogHeader className="shrink-0 border-b bg-muted/30 px-5 py-4 pr-12">
             <DialogTitle className="flex items-center gap-2">
               <span className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
                 <ClipboardList className="size-4" />
@@ -996,7 +996,7 @@ export function AttendanceManager({
             </p>
           ) : null}
 
-          <DialogFooter className="shrink-0 border-t bg-muted/20 px-5 py-3">
+          <DialogFooter className="mx-0 mb-0 shrink-0 border-t bg-muted/20 px-5 py-3">
             <Button
               variant="outline"
               onClick={() => setFormOpen(false)}
