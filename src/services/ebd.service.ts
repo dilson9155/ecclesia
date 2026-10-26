@@ -675,7 +675,17 @@ export async function listTeachers(
   scope: EbdScope,
   filters?: { status?: string; search?: string; classId?: string }
 ): Promise<EbdTeacherView[]> {
-  const where: Prisma.EbdTeacherWhereInput = { churchId: scope.churchId };
+  const memberFilter: Prisma.MemberWhereInput = {};
+  if (scope.congregationIds !== null) {
+    memberFilter.congregationId = {
+      in: scope.congregationIds.length > 0 ? scope.congregationIds : ["__none__"],
+    };
+  }
+
+  const where: Prisma.EbdTeacherWhereInput = {
+    churchId: scope.churchId,
+    ...(Object.keys(memberFilter).length > 0 ? { member: memberFilter } : {}),
+  };
 
   if (filters?.status === "ATIVO") where.active = true;
   if (filters?.status === "INATIVO") where.active = false;
@@ -686,12 +696,11 @@ export async function listTeachers(
 
   const search = filters?.search?.trim();
   if (search) {
-    where.member = {
-      OR: [
-        { name: { contains: search, mode: "insensitive" } },
-        { code: { contains: search, mode: "insensitive" } },
-      ],
-    };
+    memberFilter.OR = [
+      { name: { contains: search, mode: "insensitive" } },
+      { code: { contains: search, mode: "insensitive" } },
+    ];
+    where.member = memberFilter;
   }
 
   const rows = await prisma.ebdTeacher.findMany({
@@ -957,7 +966,21 @@ export async function getEbdOverview(scope: EbdScope): Promise<EbdOverview> {
         select: { active: true },
       }),
       prisma.ebdTeacher.findMany({
-        where: { churchId: scope.churchId },
+        where: {
+          churchId: scope.churchId,
+          ...(scope.congregationIds === null
+            ? {}
+            : {
+                member: {
+                  congregationId: {
+                    in:
+                      scope.congregationIds.length > 0
+                        ? scope.congregationIds
+                        : ["__none__"],
+                  },
+                },
+              }),
+        },
         select: { active: true },
       }),
       prisma.ebdQuarter.findMany({
