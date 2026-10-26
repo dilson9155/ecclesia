@@ -102,6 +102,9 @@ export function CarteirinhasManager({ cards, members, canEmit, canCancel }: Prop
   const [success, setSuccess] = useState<string | null>(null);
   const [batchValidity, setBatchValidity] = useState(defaultValidity());
   const [includeBack, setIncludeBack] = useState(true);
+  const [backLayout, setBackLayout] = useState<"side-by-side" | "duplex">(
+    "side-by-side"
+  );
 
   const form = useForm<{ memberId: string; validityDate: string }>({
     defaultValues: { memberId: "", validityDate: defaultValidity() },
@@ -244,10 +247,16 @@ export function CarteirinhasManager({ cards, members, canEmit, canCancel }: Prop
   }
 
   const faces = includeBack ? "both" : "front";
+  const layout = includeBack ? backLayout : "front";
+  const layoutHint = !includeBack
+    ? "5 frentes por folha"
+    : backLayout === "duplex"
+      ? "5 cartões por folha, com frentes e versos em páginas separadas"
+      : "3 cartões por folha, com o verso ao lado da frente";
   const batchUrl = `/api/cards/batch/pdf?ids=${batchCardList
     .map((card) => card.id)
-    .join(",")}&faces=${faces}`;
-  const lastIssuedUrl = `/api/cards/batch/pdf?ids=${lastIssuedIds.join(",")}&faces=${faces}`;
+    .join(",")}&faces=${faces}&layout=${layout}`;
+  const lastIssuedUrl = `/api/cards/batch/pdf?ids=${lastIssuedIds.join(",")}&faces=${faces}&layout=${layout}`;
 
   return (
     <div className="space-y-4">
@@ -297,16 +306,16 @@ export function CarteirinhasManager({ cards, members, canEmit, canCancel }: Prop
         )}
       </div>
 
-      <div className="flex flex-col gap-2 rounded-md border bg-muted/20 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 rounded-md border bg-muted/20 px-3 py-2 xl:flex-row xl:items-center xl:justify-between">
         <p className="text-sm text-muted-foreground">
           {selectedCardList.length > 0
             ? `${selectedCardList.length} carteirinha(s) selecionada(s)${
                 selectedCardList.length > 100 ? " · máximo de 100 por PDF" : ""
-              }`
-            : "Selecione carteirinhas ativas para montar uma folha A4 com 5 unidades por página (frente e verso)."}
+              } · ${layoutHint}`
+            : `Selecione carteirinhas ativas para gerar a folha A4 · ${layoutHint}`}
         </p>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <label className="flex items-center gap-2 text-sm text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="flex items-center gap-2 whitespace-nowrap text-sm text-muted-foreground">
             <input
               type="checkbox"
               className="size-4 rounded border-input accent-primary"
@@ -315,6 +324,19 @@ export function CarteirinhasManager({ cards, members, canEmit, canCancel }: Prop
             />
             Imprimir verso
           </label>
+          {includeBack ? (
+            <select
+              value={backLayout}
+              onChange={(event) =>
+                setBackLayout(event.target.value as "side-by-side" | "duplex")
+              }
+              className="h-8 rounded-md border border-input bg-transparent px-2 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              aria-label="Como imprimir o verso"
+            >
+              <option value="side-by-side">Verso ao lado da frente</option>
+              <option value="duplex">Duplex (páginas separadas)</option>
+            </select>
+          ) : null}
           <Button
             asChild
             size="sm"
@@ -566,8 +588,8 @@ export function CarteirinhasManager({ cards, members, canEmit, canCancel }: Prop
               Emitir carteirinhas em lote
             </DialogTitle>
             <DialogDescription>
-              Selecione os membros ativos. Em seguida você poderá gerar uma folha A4 com até 5
-              carteirinhas por página, com frente e verso para impressão duplex.
+              Selecione os membros ativos. Em seguida você poderá gerar uma folha A4 com o verso
+              ao lado da frente de cada carteirinha (ou em páginas separadas, para duplex).
             </DialogDescription>
           </DialogHeader>
 

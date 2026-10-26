@@ -5,7 +5,10 @@ import { scopeFromUser, scopedCongregationIdsOrNull } from "@/lib/scope";
 import { getCardsForPdf } from "@/services/cards.service";
 import { getChurchBranding } from "@/services/branding.service";
 import { auditLog } from "@/services/audit.service";
-import { buildCardSheetPages } from "@/components/carteirinhas/card-sheet";
+import {
+  buildCardSheetPages,
+  type CardSheetLayout,
+} from "@/components/carteirinhas/card-sheet";
 import type { MemberCardPdfData } from "@/components/carteirinhas/member-card-pdf";
 
 export async function GET(request: Request) {
@@ -25,9 +28,15 @@ export async function GET(request: Request) {
     return new Response("Selecione pelo menos uma carteirinha.", { status: 400 });
   }
 
-  // "both" (padrão) imprime frente e verso em páginas intercaladas para
-  // duplex; "front" mantém apenas as frentes.
+  // "both" (padrão) inclui o verso; "front" mantém apenas as frentes.
   const includeBack = searchParams.get("faces") !== "front";
+  // No modo padrão o verso fica ao lado da frente (3 cartões por folha).
+  // "duplex" imprime frentes e versos em folhas intercaladas (5 por folha).
+  const layout: CardSheetLayout = !includeBack
+    ? "front"
+    : searchParams.get("layout") === "duplex"
+      ? "duplex"
+      : "side-by-side";
 
   const congregationIds = await scopedCongregationIdsOrNull(scopeFromUser(user));
   const [cards, branding] = await Promise.all([
@@ -92,7 +101,7 @@ export async function GET(request: Request) {
 
   const doc = (
     <PDF.Document title="Carteirinhas em lote">
-      {buildCardSheetPages(data, includeBack)}
+      {buildCardSheetPages(data, layout)}
     </PDF.Document>
   );
 
