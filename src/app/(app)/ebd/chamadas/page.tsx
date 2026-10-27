@@ -42,7 +42,7 @@ export default async function EbdAttendancePage({ searchParams }: Props) {
       quarters={quarters}
       initialLessonId={canManage ? lessonId : null}
       canManage={canManage}
-      messageTemplate={messageSettings.template}
+      messageTemplate={messageSettings.absenceTemplate}
       churchName={messageSettings.churchName}
     />
   );

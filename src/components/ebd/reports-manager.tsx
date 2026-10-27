@@ -34,11 +34,17 @@ import type {
 } from "@/services/ebd-lessons.service";
 import type { EbdClassView } from "@/services/ebd.service";
 import { EmptyState } from "@/components/ebd/ebd-ui";
-import { saveEbdAbsenceTemplateAction } from "@/app/actions/ebd";
+import {
+  saveEbdAbsenceTemplateAction,
+  saveEbdBirthdayTemplateAction,
+} from "@/app/actions/ebd";
 import {
   ABSENCE_TEMPLATE_VARIABLES,
+  BIRTHDAY_TEMPLATE_VARIABLES,
   DEFAULT_ABSENCE_TEMPLATE,
+  DEFAULT_BIRTHDAY_TEMPLATE,
   buildAbsenceMessage,
+  buildBirthdayMessage,
   whatsappLink,
 } from "@/modules/ebd/message";
 
@@ -63,6 +69,8 @@ export type EbdReportTab =
   | "ranking"
   | "aniversariantes";
 
+type TemplateKind = "absence" | "birthday";
+
 type Props = {
   tab: EbdReportTab;
   quarterId: string;
@@ -76,6 +84,7 @@ type Props = {
   birthdays?: { month: number; rows: EbdBirthdayRow[] };
   canExport: boolean;
   messageTemplate?: string;
+  birthdayTemplate?: string;
   churchName?: string;
   canManageMessages?: boolean;
 };
@@ -100,11 +109,12 @@ export function ReportsManager({
   birthdays,
   canExport,
   messageTemplate,
+  birthdayTemplate,
   churchName,
   canManageMessages,
 }: Props) {
   const router = useRouter();
-  const [templateOpen, setTemplateOpen] = useState(false);
+  const [templateKind, setTemplateKind] = useState<TemplateKind | null>(null);
 
   function navigate(next: {
     tab?: EbdReportTab;
@@ -159,6 +169,15 @@ export function ReportsManager({
                 : "Todas as classes"
             }`
           : "";
+
+  const activeTemplateKind: TemplateKind =
+    templateKind ?? (tab === "aniversariantes" ? "birthday" : "absence");
+  const activeTemplate =
+    activeTemplateKind === "birthday"
+      ? birthdayTemplate ?? ""
+      : messageTemplate ?? "";
+  const canManageTabMessages =
+    !!canManageMessages && (tab === "frequencia" || tab === "aniversariantes");
 
   return (
     <div className="space-y-4">
@@ -244,11 +263,13 @@ export function ReportsManager({
         </div>
 
         <div className="flex shrink-0 flex-wrap gap-2">
-          {tab === "frequencia" && canManageMessages ? (
+          {canManageTabMessages ? (
             <Button
               type="button"
               variant="outline"
-              onClick={() => setTemplateOpen(true)}
+              onClick={() =>
+                setTemplateKind(tab === "aniversariantes" ? "birthday" : "absence")
+              }
             >
               <Settings2 className="mr-1.5 size-4" />
               Modelo de mensagem
@@ -289,16 +310,21 @@ export function ReportsManager({
       ) : tab === "ranking" && ranking ? (
         <RankingTable rows={ranking.rows} />
       ) : tab === "aniversariantes" && birthdays ? (
-        <BirthdaysTable rows={birthdays.rows} />
+        <BirthdaysTable
+          rows={birthdays.rows}
+          messageTemplate={birthdayTemplate ?? ""}
+          churchName={churchName ?? ""}
+        />
       ) : (
         <EmptyState message="Selecione os filtros para visualizar o relatório." />
       )}
 
-      {tab === "frequencia" && canManageMessages ? (
+      {canManageTabMessages ? (
         <MessageTemplateDialog
-          open={templateOpen}
-          onOpenChange={setTemplateOpen}
-          template={messageTemplate ?? ""}
+          kind={activeTemplateKind}
+          open={templateKind !== null}
+          onOpenChange={(open) => setTemplateKind(open ? activeTemplateKind : null)}
+          template={activeTemplate}
           churchName={churchName ?? ""}
         />
       ) : null}
@@ -542,42 +568,81 @@ function RankingTable({ rows }: { rows: EbdRankingRow[] }) {
   );
 }
 
-function BirthdaysTable({ rows }: { rows: EbdBirthdayRow[] }) {
+function BirthdaysTable({
+  rows,
+  messageTemplate,
+  churchName,
+}: {
+  rows: EbdBirthdayRow[];
+  messageTemplate: string;
+  churchName: string;
+}) {
   if (rows.length === 0) {
     return <EmptyState message="Nenhum aniversariante encontrado para o mês selecionado." />;
   }
   return (
-    <div className="ebd-table-shell">
-      <table className="ebd-table min-w-[460px] lg:min-w-[720px]">
-        <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
-          <tr>
-            <th className="px-3 py-2 font-medium">Dia</th>
-            <th className="px-3 py-2 font-medium">Nome</th>
-            <th className="hidden px-3 py-2 font-medium lg:table-cell">Classe</th>
-            <th className="hidden px-3 py-2 font-medium xl:table-cell">Nascimento</th>
-            <th className="px-3 py-2 text-right font-medium">Idade</th>
-            <th className="hidden px-3 py-2 font-medium lg:table-cell">Telefone</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.studentId} className="border-t">
-              <td className="px-3 py-2 font-semibold">
-                {String(row.day).padStart(2, "0")}
-              </td>
-              <td className="px-3 py-2 font-medium">{row.name}</td>
-              <td className="hidden px-3 py-2 lg:table-cell">{row.className}</td>
-              <td className="hidden px-3 py-2 text-muted-foreground xl:table-cell">
-                {row.birthDate.split("-").reverse().join("/")}
-              </td>
-              <td className="px-3 py-2 text-right">{row.age}</td>
-              <td className="hidden px-3 py-2 text-muted-foreground lg:table-cell">
-                {row.phone || "—"}
-              </td>
+    <div className="space-y-3">
+      <div className="ebd-table-shell">
+        <table className="ebd-table min-w-[560px] lg:min-w-[820px]">
+          <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+            <tr>
+              <th className="px-3 py-2 font-medium">Dia</th>
+              <th className="px-3 py-2 font-medium">Nome</th>
+              <th className="hidden px-3 py-2 font-medium lg:table-cell">Classe</th>
+              <th className="hidden px-3 py-2 font-medium xl:table-cell">Nascimento</th>
+              <th className="px-3 py-2 text-right font-medium">Idade</th>
+              <th className="hidden px-3 py-2 font-medium lg:table-cell">Telefone</th>
+              <th className="px-3 py-2 text-right font-medium">Mensagem</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.studentId} className="border-t">
+                <td className="px-3 py-2 font-semibold">
+                  {String(row.day).padStart(2, "0")}
+                </td>
+                <td className="px-3 py-2 font-medium">{row.name}</td>
+                <td className="hidden px-3 py-2 lg:table-cell">{row.className}</td>
+                <td className="hidden px-3 py-2 text-muted-foreground xl:table-cell">
+                  {row.birthDate.split("-").reverse().join("/")}
+                </td>
+                <td className="px-3 py-2 text-right">{row.age}</td>
+                <td className="hidden px-3 py-2 text-muted-foreground lg:table-cell">
+                  {row.phone || "—"}
+                </td>
+                <td className="px-3 py-2 text-right">
+                  {row.phone ? (
+                    <a
+                      href={whatsappLink(
+                        row.phone,
+                        buildBirthdayMessage(messageTemplate, {
+                          name: row.name,
+                          age: row.age,
+                          churchName,
+                        })
+                      )}
+                      target="_blank"
+                      rel="noreferrer"
+                      title={`Parabenizar ${row.name} pelo WhatsApp`}
+                      className="inline-flex items-center gap-1.5 rounded-md border border-emerald-200/80 px-2 py-1 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-50 dark:border-emerald-500/25 dark:text-emerald-300 dark:hover:bg-emerald-500/10"
+                    >
+                      <MessageCircle className="size-3.5" />
+                      Parabenizar
+                    </a>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">Sem telefone</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        O botão <strong className="font-medium text-foreground">Parabenizar</strong> abre
+        o WhatsApp com a mensagem de aniversário já preenchida, usando o telefone
+        cadastrado do aluno.
+      </p>
     </div>
   );
 }
@@ -606,11 +671,13 @@ const PREVIEW_VARS = {
 };
 
 function MessageTemplateDialog({
+  kind,
   open,
   onOpenChange,
   template,
   churchName,
 }: {
+  kind: TemplateKind;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   template: string;
@@ -621,6 +688,14 @@ function MessageTemplateDialog({
   const [value, setValue] = useState(template);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const isBirthday = kind === "birthday";
+  const variables = isBirthday
+    ? BIRTHDAY_TEMPLATE_VARIABLES
+    : ABSENCE_TEMPLATE_VARIABLES;
+  const defaultTemplate = isBirthday
+    ? DEFAULT_BIRTHDAY_TEMPLATE
+    : DEFAULT_ABSENCE_TEMPLATE;
 
   function handleOpenChange(next: boolean) {
     if (next) {
@@ -651,7 +726,9 @@ function MessageTemplateDialog({
   async function submit() {
     setSaving(true);
     setError(null);
-    const result = await saveEbdAbsenceTemplateAction(value);
+    const result = isBirthday
+      ? await saveEbdBirthdayTemplateAction(value)
+      : await saveEbdAbsenceTemplateAction(value);
     setSaving(false);
     if (!result.ok) {
       setError(result.error);
@@ -661,19 +738,28 @@ function MessageTemplateDialog({
     router.refresh();
   }
 
-  const preview = buildAbsenceMessage(value || "", {
-    ...PREVIEW_VARS,
-    churchName: churchName || PREVIEW_VARS.churchName,
-  });
+  const preview = isBirthday
+    ? buildBirthdayMessage(value || "", {
+        name: PREVIEW_VARS.name,
+        age: 34,
+        churchName: churchName || PREVIEW_VARS.churchName,
+      })
+    : buildAbsenceMessage(value || "", {
+        ...PREVIEW_VARS,
+        churchName: churchName || PREVIEW_VARS.churchName,
+      });
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>Modelo de mensagem</DialogTitle>
+          <DialogTitle>
+            {isBirthday ? "Mensagem de aniversário" : "Modelo de mensagem"}
+          </DialogTitle>
           <DialogDescription>
-            Personalize o texto usado no botão Avisar do WhatsApp. Os campos entre
-            chaves são substituídos automaticamente.
+            {isBirthday
+              ? "Personalize o texto usado no botão Parabenizar do WhatsApp. Os campos entre chaves são substituídos automaticamente."
+              : "Personalize o texto usado no botão Avisar do WhatsApp. Os campos entre chaves são substituídos automaticamente."}
           </DialogDescription>
         </DialogHeader>
 
@@ -685,12 +771,16 @@ function MessageTemplateDialog({
               onChange={(event) => setValue(event.target.value)}
               rows={5}
               maxLength={600}
-              placeholder="Escreva a mensagem de acompanhamento..."
+              placeholder={
+                isBirthday
+                  ? "Escreva a mensagem de aniversário..."
+                  : "Escreva a mensagem de acompanhamento..."
+              }
               className="min-h-28 resize-y"
             />
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="text-xs text-muted-foreground">Inserir:</span>
-              {ABSENCE_TEMPLATE_VARIABLES.map((item) => (
+              {variables.map((item) => (
                 <button
                   key={item.key}
                   type="button"
@@ -703,7 +793,7 @@ function MessageTemplateDialog({
               ))}
               <button
                 type="button"
-                onClick={() => setValue(DEFAULT_ABSENCE_TEMPLATE)}
+                onClick={() => setValue(defaultTemplate)}
                 className="ml-auto text-[11px] font-medium text-muted-foreground underline-offset-2 hover:text-primary hover:underline"
               >
                 Restaurar padrão

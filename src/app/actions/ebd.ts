@@ -36,7 +36,7 @@ import {
   type EbdAttendanceEntryInput,
   type EbdLessonView,
 } from "@/services/ebd-lessons.service";
-import { saveEbdAbsenceTemplate } from "@/services/ebd-settings.service";
+import { saveEbdAbsenceTemplate, saveEbdBirthdayTemplate } from "@/services/ebd-settings.service";
 
 type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -101,8 +101,9 @@ export async function deleteEbdClass(id: string) {
 /* Mensagens de acompanhamento                                                 */
 /* -------------------------------------------------------------------------- */
 
-export async function saveEbdAbsenceTemplateAction(
-  template: string
+async function saveMessageTemplate(
+  template: string,
+  save: (churchId: string, template: string) => Promise<void>
 ): Promise<ActionResult> {
   const user = await requirePermission("ebd.manage");
   if (!user.churchId) {
@@ -110,13 +111,25 @@ export async function saveEbdAbsenceTemplateAction(
   }
 
   try {
-    await saveEbdAbsenceTemplate(user.churchId, template);
+    await save(user.churchId, template);
   } catch (error) {
     return { ok: false, error: (error as Error).message };
   }
 
   revalidateEbd();
   return { ok: true };
+}
+
+export async function saveEbdAbsenceTemplateAction(
+  template: string
+): Promise<ActionResult> {
+  return saveMessageTemplate(template, saveEbdAbsenceTemplate);
+}
+
+export async function saveEbdBirthdayTemplateAction(
+  template: string
+): Promise<ActionResult> {
+  return saveMessageTemplate(template, saveEbdBirthdayTemplate);
 }
 
 /* -------------------------------------------------------------------------- */

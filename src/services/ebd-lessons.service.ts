@@ -1061,7 +1061,9 @@ export async function getBirthdays(
       ...(filters.classId ? { classId: filters.classId } : {}),
     },
     include: {
-      member: { select: { name: true, code: true, birthDate: true, phone: true } },
+      member: {
+        select: { name: true, code: true, birthDate: true, phone: true, whatsapp: true },
+      },
       class: { select: { name: true } },
     },
   });
@@ -1089,7 +1091,7 @@ export async function getBirthdays(
         birthDate: birth.toISOString().slice(0, 10),
         day,
         age: Math.max(age, 0),
-        phone: student.member.phone,
+        phone: student.member.phone ?? student.member.whatsapp ?? null,
       };
     })
     .sort((a, b) => a.day - b.day || a.name.localeCompare(b.name));

@@ -72,7 +72,9 @@ export default async function EbdReportsPage({ searchParams }: Props) {
       : undefined;
 
   const messageSettings =
-    tab === "frequencia" ? await getEbdMessageSettings(user.churchId) : null;
+    tab === "frequencia" || tab === "aniversariantes"
+      ? await getEbdMessageSettings(user.churchId)
+      : null;
   const canManage = await can(user, "ebd.manage");
 
   const ranking =
@@ -101,7 +103,8 @@ export default async function EbdReportsPage({ searchParams }: Props) {
       classes={classes}
       performance={performance}
       attendance={attendance}
-      messageTemplate={messageSettings?.template}
+      messageTemplate={messageSettings?.absenceTemplate}
+      birthdayTemplate={messageSettings?.birthdayTemplate}
       churchName={messageSettings?.churchName}
       canManageMessages={canManage}
       ranking={ranking}
