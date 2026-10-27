@@ -252,7 +252,7 @@ export function CarteirinhasManager({ cards, members, canEmit, canCancel }: Prop
     ? "5 frentes por folha"
     : backLayout === "duplex"
       ? "5 cartões por folha, com frentes e versos em páginas separadas"
-      : "3 cartões por folha, com o verso ao lado da frente";
+      : "5 cartões por folha, com o verso ao lado da frente";
   const batchUrl = `/api/cards/batch/pdf?ids=${batchCardList
     .map((card) => card.id)
     .join(",")}&faces=${faces}&layout=${layout}`;

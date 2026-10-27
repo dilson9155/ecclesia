@@ -9,7 +9,7 @@ import {
 } from "./member-card-pdf";
 
 const CARDS_PER_PAGE = 5;
-const CARDS_PER_PAGE_PAIRS = 3;
+const CARDS_PER_PAGE_PAIRS = 5;
 const CARDS_PER_ROW = 2;
 
 /** A4 em pontos (72 por polegada). */
@@ -20,7 +20,7 @@ const GAP = 9;
 /**
  * Como o verso é impresso:
  * - `front`: apenas as frentes, 5 por folha;
- * - `side-by-side`: frente e verso lado a lado, 3 cartões por folha;
+ * - `side-by-side`: frente e verso lado a lado, 5 cartões por folha;
  * - `duplex`: frentes e versos em páginas intercaladas, 5 por folha.
  */
 export type CardSheetLayout = "front" | "side-by-side" | "duplex";
