@@ -1086,3 +1086,202 @@ export async function getBirthdays(
 
   return { month, rows };
 }
+
+export type EbdAttendanceReportRow = {
+  studentId: string;
+  name: string;
+  code: string;
+  className: string;
+  phone: string | null;
+  lessons: number;
+  presences: number;
+  absences: number;
+  percent: number;
+  lastAbsence: string | null;
+  consecutiveAbsences: number;
+};
+
+export type EbdAttendanceReport = {
+  quarterId: string | null;
+  quarterName: string;
+  classId: string | null;
+  className: string;
+  lessons: number;
+  averagePercent: number;
+  rows: EbdAttendanceReportRow[];
+};
+
+export async function getAttendanceReport(
+  scope: EbdScope,
+  filters: { quarterId?: string; classId?: string }
+): Promise<EbdAttendanceReport> {
+  const where: Prisma.EbdAttendanceWhereInput = {
+    churchId: scope.churchId,
+    class: congregationFilter(scope),
+  };
+  if (filters.quarterId) where.quarterId = filters.quarterId;
+  if (filters.classId) where.classId = filters.classId;
+
+  const [attendances, students] = await Promise.all([
+    prisma.ebdAttendance.findMany({
+      where,
+      orderBy: [{ date: "asc" }, { createdAt: "asc" }],
+      select: {
+        date: true,
+        classId: true,
+        quarter: { select: { name: true } },
+        class: { select: { name: true } },
+        entries: {
+          select: {
+            studentId: true,
+            present: true,
+            student: {
+              select: {
+                member: {
+                  select: { name: true, code: true, phone: true, whatsapp: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    }),
+    prisma.ebdStudent.findMany({
+      where: {
+        churchId: scope.churchId,
+        class: congregationFilter(scope),
+        ...(filters.classId ? { classId: filters.classId } : {}),
+      },
+      select: {
+        id: true,
+        active: true,
+        classId: true,
+        member: {
+          select: { name: true, code: true, phone: true, whatsapp: true },
+        },
+        class: { select: { name: true } },
+      },
+    }),
+  ]);
+
+  /** Quantidade de chamadas por classe e data da última chamada de cada classe. */
+  const classLessons = new Map<string, number>();
+  const classLastDate = new Map<string, string>();
+  /** Presenças por aluno, em ordem cronológica. */
+  const studentFlags = new Map<string, boolean[]>();
+  const studentAbsences = new Map<string, string[]>();
+
+  for (const attendance of attendances) {
+    const day = attendance.date.toISOString().slice(0, 10);
+    classLessons.set(attendance.classId, (classLessons.get(attendance.classId) ?? 0) + 1);
+    classLastDate.set(attendance.classId, day);
+
+    for (const entry of attendance.entries) {
+      const flags = studentFlags.get(entry.studentId) ?? [];
+      flags.push(entry.present);
+      studentFlags.set(entry.studentId, flags);
+
+      if (!entry.present) {
+        const dates = studentAbsences.get(entry.studentId) ?? [];
+        dates.push(day);
+        studentAbsences.set(entry.studentId, dates);
+      }
+    }
+  }
+
+  /** Alunos ativos + quem já teve chamada registrada no período. */
+  const known = new Set<string>();
+  const rows: EbdAttendanceReportRow[] = [];
+
+  for (const student of students) {
+    const flags = studentFlags.get(student.id);
+    if (!student.active && !flags) continue;
+
+    known.add(student.id);
+    const lessons = flags?.length ?? classLessons.get(student.classId) ?? 0;
+    const presences = flags?.filter(Boolean).length ?? 0;
+    const absenceDates =
+      studentAbsences.get(student.id) ??
+      (lessons > 0 ? [classLastDate.get(student.classId) ?? ""].filter(Boolean) : []);
+
+    let consecutiveAbsences = 0;
+    if (flags) {
+      for (let index = flags.length - 1; index >= 0 && !flags[index]; index -= 1) {
+        consecutiveAbsences += 1;
+      }
+    } else {
+      consecutiveAbsences = lessons;
+    }
+
+    rows.push({
+      studentId: student.id,
+      name: student.member.name,
+      code: student.member.code,
+      className: student.class.name,
+      phone: student.member.phone ?? student.member.whatsapp ?? null,
+      lessons,
+      presences,
+      absences: lessons - presences,
+      percent: lessons > 0 ? Math.round((presences / lessons) * 100) : 0,
+      lastAbsence:
+        absenceDates.length > 0 ? absenceDates[absenceDates.length - 1] : null,
+      consecutiveAbsences,
+    });
+  }
+
+  // Alunos que têm chamada no período mas não estão mais na listagem da classe.
+  for (const attendance of attendances) {
+    for (const entry of attendance.entries) {
+      if (known.has(entry.studentId)) continue;
+      known.add(entry.studentId);
+
+      const flags = studentFlags.get(entry.studentId) ?? [];
+      const presences = flags.filter(Boolean).length;
+      const absenceDates = studentAbsences.get(entry.studentId) ?? [];
+      let consecutiveAbsences = 0;
+      for (let index = flags.length - 1; index >= 0 && !flags[index]; index -= 1) {
+        consecutiveAbsences += 1;
+      }
+
+      rows.push({
+        studentId: entry.studentId,
+        name: entry.student.member.name,
+        code: entry.student.member.code,
+        className: attendance.class.name,
+        phone: entry.student.member.phone ?? entry.student.member.whatsapp ?? null,
+        lessons: flags.length,
+        presences,
+        absences: flags.length - presences,
+        percent:
+          flags.length > 0 ? Math.round((presences / flags.length) * 100) : 0,
+        lastAbsence:
+          absenceDates.length > 0 ? absenceDates[absenceDates.length - 1] : null,
+        consecutiveAbsences,
+      });
+    }
+  }
+
+  rows.sort(
+    (a, b) =>
+      a.percent - b.percent ||
+      b.absences - a.absences ||
+      a.name.localeCompare(b.name)
+  );
+
+  const averagePercent =
+    rows.length > 0
+      ? Math.round(rows.reduce((sum, row) => sum + row.percent, 0) / rows.length)
+      : 0;
+
+  return {
+    quarterId: filters.quarterId ?? null,
+    quarterName: attendances[0]?.quarter.name ?? "Todos os trimestres",
+    classId: filters.classId ?? null,
+    className: filters.classId
+      ? attendances[0]?.class.name ?? "Classe"
+      : "Todas as classes",
+    lessons: attendances.length,
+    averagePercent,
+    rows,
+  };
+}

@@ -2,6 +2,7 @@ import { requirePermission } from "@/lib/rbac";
 import { ebdScopeFromUser } from "@/lib/ebd-scope";
 import { listClasses } from "@/services/ebd.service";
 import {
+  getAttendanceReport,
   getBirthdays,
   getPerformanceReport,
   getRanking,
@@ -23,7 +24,12 @@ type Props = {
   }>;
 };
 
-const TABS: EbdReportTab[] = ["boletim", "ranking", "aniversariantes"];
+const TABS: EbdReportTab[] = [
+  "boletim",
+  "frequencia",
+  "ranking",
+  "aniversariantes",
+];
 
 export default async function EbdReportsPage({ searchParams }: Props) {
   const user = await requirePermission("ebd.reports");
@@ -56,6 +62,14 @@ export default async function EbdReportsPage({ searchParams }: Props) {
         })
       : undefined;
 
+  const attendance =
+    tab === "frequencia"
+      ? await getAttendanceReport(scope, {
+          quarterId: quarterId || undefined,
+          classId: classId || undefined,
+        })
+      : undefined;
+
   const ranking =
     tab === "ranking"
       ? await getRanking(scope, {
@@ -81,6 +95,7 @@ export default async function EbdReportsPage({ searchParams }: Props) {
       quarters={quarters}
       classes={classes}
       performance={performance}
+      attendance={attendance}
       ranking={ranking}
       birthdays={birthdays}
       canExport

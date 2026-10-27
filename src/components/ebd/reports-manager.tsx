@@ -2,10 +2,19 @@
 
 import { useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { BarChart3, Cake, Download, FileText, Printer, Trophy } from "lucide-react";
+import {
+  BarChart3,
+  Cake,
+  CalendarCheck,
+  Download,
+  FileText,
+  Printer,
+  Trophy,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SELECT_INPUT_CLASS } from "@/lib/styles";
 import type {
+  EbdAttendanceReport,
   EbdBirthdayRow,
   EbdPerformanceReport,
   EbdQuarterView,
@@ -29,7 +38,11 @@ const MONTHS = [
   "Dezembro",
 ];
 
-export type EbdReportTab = "boletim" | "ranking" | "aniversariantes";
+export type EbdReportTab =
+  | "boletim"
+  | "frequencia"
+  | "ranking"
+  | "aniversariantes";
 
 type Props = {
   tab: EbdReportTab;
@@ -39,6 +52,7 @@ type Props = {
   quarters: EbdQuarterView[];
   classes: EbdClassView[];
   performance?: EbdPerformanceReport;
+  attendance?: EbdAttendanceReport;
   ranking?: { quarterName: string; className: string; rows: EbdRankingRow[] };
   birthdays?: { month: number; rows: EbdBirthdayRow[] };
   canExport: boolean;
@@ -46,6 +60,7 @@ type Props = {
 
 const TABS: Array<{ key: EbdReportTab; label: string; icon: typeof BarChart3 }> = [
   { key: "boletim", label: "Boletim de Desempenho", icon: BarChart3 },
+  { key: "frequencia", label: "Frequência", icon: CalendarCheck },
   { key: "ranking", label: "Ranking de Pontuação", icon: Trophy },
   { key: "aniversariantes", label: "Aniversariantes", icon: Cake },
 ];
@@ -58,6 +73,7 @@ export function ReportsManager({
   quarters,
   classes,
   performance,
+  attendance,
   ranking,
   birthdays,
   canExport,
@@ -90,9 +106,11 @@ export function ReportsManager({
     const base =
       tab === "boletim"
         ? "/api/ebd/relatorios/boletim"
-        : tab === "ranking"
-          ? "/api/ebd/relatorios/ranking"
-          : "/api/ebd/relatorios/aniversariantes";
+        : tab === "frequencia"
+          ? "/api/ebd/relatorios/frequencia"
+          : tab === "ranking"
+            ? "/api/ebd/relatorios/ranking"
+            : "/api/ebd/relatorios/aniversariantes";
     const query = params.toString();
     const inline = query ? `${base}?${query}` : base;
     return {
@@ -104,7 +122,9 @@ export function ReportsManager({
   const subtitle =
     tab === "boletim" && performance
       ? `${performance.quarterName} · ${performance.className} · ${performance.lessons} aula(s)`
-      : tab === "ranking" && ranking
+      : tab === "frequencia" && attendance
+        ? `${attendance.quarterName} · ${attendance.className} · ${attendance.lessons} chamada(s)`
+        : tab === "ranking" && ranking
         ? `${ranking.quarterName} · ${ranking.className}`
         : tab === "aniversariantes" && birthdays
           ? `${MONTHS[birthdays.month - 1]} · ${
@@ -222,6 +242,8 @@ export function ReportsManager({
 
       {tab === "boletim" && performance ? (
         <PerformanceTable report={performance} />
+      ) : tab === "frequencia" && attendance ? (
+        <AttendanceTable report={attendance} />
       ) : tab === "ranking" && ranking ? (
         <RankingTable rows={ranking.rows} />
       ) : tab === "aniversariantes" && birthdays ? (
@@ -229,6 +251,98 @@ export function ReportsManager({
       ) : (
         <EmptyState message="Selecione os filtros para visualizar o relatório." />
       )}
+    </div>
+  );
+}
+
+function AttendanceTable({ report }: { report: EbdAttendanceReport }) {
+  const atRisk = report.rows.filter((row) => row.percent < 75).length;
+  const totalAbsences = report.rows.reduce((sum, row) => sum + row.absences, 0);
+
+  return (
+    <div className="space-y-3">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Summary label="Chamadas no período" value={String(report.lessons)} />
+        <Summary label="Alunos" value={String(report.rows.length)} />
+        <Summary label="Faltas" value={String(totalAbsences)} />
+        <Summary label="Frequência média" value={`${report.averagePercent}%`} />
+      </div>
+      {report.rows.length === 0 ? (
+        <EmptyState message="Nenhuma chamada registrada para os filtros selecionados." />
+      ) : (
+        <div className="ebd-table-shell">
+          <table className="ebd-table min-w-[520px] lg:min-w-[820px]">
+            <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+              <tr>
+                <th className="px-3 py-2 font-medium">Aluno</th>
+                <th className="hidden px-3 py-2 font-medium lg:table-cell">Classe</th>
+                <th className="hidden px-3 py-2 font-medium xl:table-cell">Telefone</th>
+                <th className="hidden px-3 py-2 text-right font-medium lg:table-cell">Aulas</th>
+                <th className="px-3 py-2 text-right font-medium">Presenças</th>
+                <th className="px-3 py-2 text-right font-medium">Faltas</th>
+                <th className="px-3 py-2 text-right font-medium">Frequência</th>
+                <th className="px-3 py-2 font-medium">Situação</th>
+              </tr>
+            </thead>
+            <tbody>
+              {report.rows.map((row) => (
+                <tr key={row.studentId} className="border-t">
+                  <td className="px-3 py-2 font-medium">{row.name}</td>
+                  <td className="hidden px-3 py-2 lg:table-cell">{row.className}</td>
+                  <td className="hidden px-3 py-2 text-muted-foreground xl:table-cell">
+                    {row.phone || "—"}
+                  </td>
+                  <td className="hidden px-3 py-2 text-right lg:table-cell">{row.lessons}</td>
+                  <td className="px-3 py-2 text-right">{row.presences}</td>
+                  <td className="px-3 py-2 text-right">
+                    <span className="block font-medium tabular-nums">{row.absences}</span>
+                    {row.consecutiveAbsences >= 2 ? (
+                      <span className="block text-[10px] font-medium text-amber-600">
+                        {row.consecutiveAbsences} seguidas
+                      </span>
+                    ) : null}
+                  </td>
+                  <td className="px-3 py-2 text-right font-medium tabular-nums">
+                    {row.percent}%
+                  </td>
+                  <td className="px-3 py-2">
+                    <span
+                      className={
+                        row.percent >= 75
+                          ? "inline-flex items-center gap-1.5 rounded-full border border-emerald-200/80 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:border-emerald-500/25 dark:bg-emerald-500/10 dark:text-emerald-300"
+                          : row.percent >= 50
+                            ? "inline-flex items-center gap-1.5 rounded-full border border-amber-200/80 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:border-amber-500/25 dark:bg-amber-500/10 dark:text-amber-300"
+                            : "inline-flex items-center gap-1.5 rounded-full border border-rose-200/80 bg-rose-50 px-2 py-0.5 text-[11px] font-medium text-rose-700 dark:border-rose-500/25 dark:bg-rose-500/10 dark:text-rose-300"
+                      }
+                    >
+                      <span
+                        className={
+                          row.percent >= 75
+                            ? "size-1.5 rounded-full bg-emerald-500"
+                            : row.percent >= 50
+                              ? "size-1.5 rounded-full bg-amber-500"
+                              : "size-1.5 rounded-full bg-rose-500"
+                        }
+                      />
+                      {row.percent >= 75
+                        ? "Regular"
+                        : row.percent >= 50
+                          ? "Atenção"
+                          : "Crítico"}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {atRisk > 0 ? (
+        <p className="text-xs text-muted-foreground">
+          {atRisk} aluno(s) com frequência abaixo de 75% — considere um contato de
+          acompanhamento.
+        </p>
+      ) : null}
     </div>
   );
 }

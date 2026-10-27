@@ -8,6 +8,7 @@ import {
 } from "@/components/reports/report-pdf";
 import type { ReportContext } from "@/services/reports.service";
 import type {
+  EbdAttendanceReport,
   EbdBirthdayRow,
   EbdPerformanceReport,
   EbdRankingRow,
@@ -87,6 +88,55 @@ export function PerformanceReportPdf({
             `${row.percent}%`,
           ])}
         />
+        <ReportFooter context={context} />
+      </PDF.Page>
+    </PDF.Document>
+  );
+}
+
+export function AttendanceReportPdf({
+  context,
+  report,
+}: {
+  context: ReportContext;
+  report: EbdAttendanceReport;
+}) {
+  const atRisk = report.rows.filter((row) => row.percent < 75).length;
+  const totalAbsences = report.rows.reduce((sum, row) => sum + row.absences, 0);
+
+  return (
+    <PDF.Document title="Relatório de Frequência — EBD">
+      <PDF.Page size="A4" style={styles.page}>
+        <ReportHeader
+          context={context}
+          title="Relatório de Frequência — EBD"
+          subtitle={subtitle(report)}
+        />
+        <PdfSummary
+          items={[
+            { label: "Chamadas no período", value: String(report.lessons) },
+            { label: "Alunos", value: String(report.rows.length) },
+            { label: "Faltas", value: String(totalAbsences) },
+            { label: "Frequência média", value: `${report.averagePercent}%` },
+          ]}
+        />
+        <PdfTable
+          headers={["Aluno", "Classe", "Aulas", "Presenças", "Faltas", "Frequência"]}
+          align={["left", "left", "right", "right", "right", "right"]}
+          rows={report.rows.map((row) => [
+            row.name,
+            row.className,
+            row.lessons,
+            row.presences,
+            row.absences,
+            `${row.percent}%`,
+          ])}
+        />
+        {atRisk > 0 ? (
+          <PDF.Text style={styles.filters}>
+            {atRisk} aluno(s) com frequência abaixo de 75%.
+          </PDF.Text>
+        ) : null}
         <ReportFooter context={context} />
       </PDF.Page>
     </PDF.Document>

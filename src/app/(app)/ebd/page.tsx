@@ -74,7 +74,8 @@ export default async function EbdOverviewPage() {
           {
             href: "/ebd/relatorios",
             title: "Relatórios pedagógicos",
-            description: "Boletim, ranking de pontuação e aniversariantes.",
+            description:
+              "Boletim, frequência, ranking de pontuação e aniversariantes.",
             icon: CalendarDays,
           },
         ]
