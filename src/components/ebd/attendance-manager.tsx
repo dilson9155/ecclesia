@@ -9,6 +9,7 @@ import {
   ClipboardList,
   Clock3,
   Loader2,
+  MessageCircle,
   Minus,
   Pencil,
   Plus,
@@ -49,11 +50,13 @@ import type {
 } from "@/services/ebd-lessons.service";
 import type { EbdClassView } from "@/services/ebd.service";
 import { EmptyState, Field } from "@/components/ebd/ebd-ui";
+import { buildAbsenceMessage, whatsappLink } from "@/modules/ebd/message";
 
 type Entry = {
   studentId: string;
   name: string;
   code: string;
+  phone: string | null;
   present: boolean;
   lessonScore: number;
   participationScore: number;
@@ -68,6 +71,8 @@ type Props = {
   quarters: EbdQuarterView[];
   initialLessonId: string | null;
   canManage: boolean;
+  messageTemplate: string;
+  churchName: string;
 };
 
 const SCORE_FIELDS = [
@@ -268,6 +273,8 @@ export function AttendanceManager({
   quarters,
   initialLessonId,
   canManage,
+  messageTemplate,
+  churchName,
 }: Props) {
   const router = useRouter();
   const [quarterFilter, setQuarterFilter] = useState("");
@@ -285,6 +292,7 @@ export function AttendanceManager({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [lessonId, setLessonId] = useState("");
   const [lessonLabel, setLessonLabel] = useState("");
+  const [classLabel, setClassLabel] = useState("");
   const [date, setDate] = useState(todayIso());
   const [notes, setNotes] = useState("");
   const [entries, setEntries] = useState<Entry[]>([]);
@@ -352,12 +360,14 @@ export function AttendanceManager({
     setLessonLabel(
       `Lição ${result.lesson.number} — ${result.lesson.title} · ${result.lesson.className}`
     );
+    setClassLabel(result.lesson.className);
     setDate(result.lesson.date || todayIso());
     setEntries(
       result.students.map((student) => ({
         studentId: student.studentId,
         name: student.name,
         code: student.code,
+        phone: student.phone,
         present: false,
         lessonScore: 0,
         participationScore: 0,
@@ -384,6 +394,7 @@ export function AttendanceManager({
     setLessonLabel(
       `Lição ${attendance.lessonNumber} — ${attendance.lessonTitle} · ${attendance.className}`
     );
+    setClassLabel(attendance.className);
     setDate(attendance.date);
     setNotes(attendance.notes ?? "");
     setEntries(
@@ -391,6 +402,7 @@ export function AttendanceManager({
         studentId: entry.studentId,
         name: entry.studentName,
         code: entry.studentCode,
+        phone: entry.phone,
         present: entry.present,
         lessonScore: entry.lessonScore,
         participationScore: entry.participationScore,
@@ -961,6 +973,26 @@ export function AttendanceManager({
                               >
                                 {total}/{EBD_MAX_SCORE}
                               </span>
+                              {!entry.present && entry.phone ? (
+                                <a
+                                  href={whatsappLink(
+                                    entry.phone,
+                                    buildAbsenceMessage(messageTemplate, {
+                                      name: entry.name,
+                                      date,
+                                      className: classLabel,
+                                      absences: 1,
+                                      churchName,
+                                    })
+                                  )}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  title={`Avisar ${entry.name} pelo WhatsApp`}
+                                  className="inline-flex size-8 items-center justify-center rounded-full border border-emerald-200/80 text-emerald-700 transition-colors hover:bg-emerald-50 dark:border-emerald-500/25 dark:text-emerald-300 dark:hover:bg-emerald-500/10"
+                                >
+                                  <MessageCircle className="size-4" />
+                                </a>
+                              ) : null}
                               <button
                                 type="button"
                                 onClick={() => togglePresence(entry)}

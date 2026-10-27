@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   BarChart3,
@@ -8,15 +8,25 @@ import {
   CalendarCheck,
   Download,
   FileText,
+  Loader2,
   MessageCircle,
   Printer,
+  Settings2,
   Trophy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { SELECT_INPUT_CLASS } from "@/lib/styles";
 import type {
   EbdAttendanceReport,
-  EbdAttendanceReportRow,
   EbdBirthdayRow,
   EbdPerformanceReport,
   EbdQuarterView,
@@ -24,6 +34,13 @@ import type {
 } from "@/services/ebd-lessons.service";
 import type { EbdClassView } from "@/services/ebd.service";
 import { EmptyState } from "@/components/ebd/ebd-ui";
+import { saveEbdAbsenceTemplateAction } from "@/app/actions/ebd";
+import {
+  ABSENCE_TEMPLATE_VARIABLES,
+  DEFAULT_ABSENCE_TEMPLATE,
+  buildAbsenceMessage,
+  whatsappLink,
+} from "@/modules/ebd/message";
 
 const MONTHS = [
   "Janeiro",
@@ -58,6 +75,9 @@ type Props = {
   ranking?: { quarterName: string; className: string; rows: EbdRankingRow[] };
   birthdays?: { month: number; rows: EbdBirthdayRow[] };
   canExport: boolean;
+  messageTemplate?: string;
+  churchName?: string;
+  canManageMessages?: boolean;
 };
 
 const TABS: Array<{ key: EbdReportTab; label: string; icon: typeof BarChart3 }> = [
@@ -79,8 +99,12 @@ export function ReportsManager({
   ranking,
   birthdays,
   canExport,
+  messageTemplate,
+  churchName,
+  canManageMessages,
 }: Props) {
   const router = useRouter();
+  const [templateOpen, setTemplateOpen] = useState(false);
 
   function navigate(next: {
     tab?: EbdReportTab;
@@ -219,22 +243,34 @@ export function ReportsManager({
           </label>
         </div>
 
-        {canExport ? (
-          <div className="flex shrink-0 flex-wrap gap-2">
-            <Button asChild variant="outline">
-              <a href={pdfUrl} target="_blank" rel="noreferrer">
-                <Printer className="mr-1.5 size-4" />
-                Imprimir
-              </a>
+        <div className="flex shrink-0 flex-wrap gap-2">
+          {tab === "frequencia" && canManageMessages ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setTemplateOpen(true)}
+            >
+              <Settings2 className="mr-1.5 size-4" />
+              Modelo de mensagem
             </Button>
-            <Button asChild>
-              <a href={pdfDownloadUrl} download>
-                <Download className="mr-1.5 size-4" />
-                Baixar PDF
-              </a>
-            </Button>
-          </div>
-        ) : null}
+          ) : null}
+          {canExport ? (
+            <>
+              <Button asChild variant="outline">
+                <a href={pdfUrl} target="_blank" rel="noreferrer">
+                  <Printer className="mr-1.5 size-4" />
+                  Imprimir
+                </a>
+              </Button>
+              <Button asChild>
+                <a href={pdfDownloadUrl} download>
+                  <Download className="mr-1.5 size-4" />
+                  Baixar PDF
+                </a>
+              </Button>
+            </>
+          ) : null}
+        </div>
       </div>
 
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -245,7 +281,11 @@ export function ReportsManager({
       {tab === "boletim" && performance ? (
         <PerformanceTable report={performance} />
       ) : tab === "frequencia" && attendance ? (
-        <AttendanceTable report={attendance} />
+        <AttendanceTable
+          report={attendance}
+          messageTemplate={messageTemplate ?? ""}
+          churchName={churchName ?? ""}
+        />
       ) : tab === "ranking" && ranking ? (
         <RankingTable rows={ranking.rows} />
       ) : tab === "aniversariantes" && birthdays ? (
@@ -253,39 +293,28 @@ export function ReportsManager({
       ) : (
         <EmptyState message="Selecione os filtros para visualizar o relatório." />
       )}
+
+      {tab === "frequencia" && canManageMessages ? (
+        <MessageTemplateDialog
+          open={templateOpen}
+          onOpenChange={setTemplateOpen}
+          template={messageTemplate ?? ""}
+          churchName={churchName ?? ""}
+        />
+      ) : null}
     </div>
   );
 }
 
-function formatIsoDate(value: string | null) {
-  if (!value) return "";
-  const [year, month, day] = value.split("-");
-  return `${day}/${month}/${year}`;
-}
-
-function whatsappLink(phone: string, message: string) {
-  const digits = phone.replace(/\D/g, "");
-  const withCountry = digits.length <= 11 ? `55${digits}` : digits;
-  return `https://wa.me/${withCountry}?text=${encodeURIComponent(message)}`;
-}
-
-function absenceMessage(row: EbdAttendanceReportRow) {
-  const firstName = row.name.split(" ")[0];
-  const lastAbsence = formatIsoDate(row.lastAbsence);
-  const faltas = row.absences === 1 ? "1 falta" : `${row.absences} faltas`;
-
-  if (row.consecutiveAbsences >= 2) {
-    return `Olá, ${firstName}! Sentimos sua falta nas últimas aulas da EBD (última em ${lastAbsence}). Esperamos você no próximo encontro. Deus abençoe!`;
-  }
-
-  if (row.consecutiveAbsences === 1) {
-    return `Olá, ${firstName}! Sentimos sua falta na EBD do dia ${lastAbsence}. Esperamos você na próxima aula. Deus abençoe!`;
-  }
-
-  return `Olá, ${firstName}! Tudo bem? Notamos ${faltas} na EBD neste trimestre. Conte com a gente e esperamos você na próxima aula. Deus abençoe!`;
-}
-
-function AttendanceTable({ report }: { report: EbdAttendanceReport }) {
+function AttendanceTable({
+  report,
+  messageTemplate,
+  churchName,
+}: {
+  report: EbdAttendanceReport;
+  messageTemplate: string;
+  churchName: string;
+}) {
   const atRisk = report.rows.filter((row) => row.percent < 75).length;
   const totalAbsences = report.rows.reduce((sum, row) => sum + row.absences, 0);
 
@@ -365,7 +394,16 @@ function AttendanceTable({ report }: { report: EbdAttendanceReport }) {
                   <td className="px-3 py-2 text-right">
                     {row.phone && row.absences > 0 ? (
                       <a
-                        href={whatsappLink(row.phone, absenceMessage(row))}
+                        href={whatsappLink(
+                          row.phone,
+                          buildAbsenceMessage(messageTemplate, {
+                            name: row.name,
+                            date: row.lastAbsence,
+                            className: row.className,
+                            absences: row.absences,
+                            churchName,
+                          })
+                        )}
                         target="_blank"
                         rel="noreferrer"
                         title={`Enviar mensagem para ${row.phone}`}
@@ -556,5 +594,153 @@ function Summary({ label, value }: { label: string; value: string }) {
       </p>
       <p className="mt-1.5 text-2xl font-semibold leading-none tabular-nums">{value}</p>
     </div>
+  );
+}
+
+const PREVIEW_VARS = {
+  name: "Maria da Silva",
+  date: "2026-10-25",
+  className: "Classe Adultos",
+  absences: 2,
+  churchName: "Igreja Exemplo",
+};
+
+function MessageTemplateDialog({
+  open,
+  onOpenChange,
+  template,
+  churchName,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  template: string;
+  churchName: string;
+}) {
+  const router = useRouter();
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [value, setValue] = useState(template);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function handleOpenChange(next: boolean) {
+    if (next) {
+      setValue(template);
+      setError(null);
+    }
+    onOpenChange(next);
+  }
+
+  function insertVariable(variable: string) {
+    const textarea = textareaRef.current;
+    if (!textarea) {
+      setValue((current) => `${current}${variable}`);
+      return;
+    }
+    const focused = document.activeElement === textarea;
+    const start = focused ? (textarea.selectionStart ?? value.length) : value.length;
+    const end = focused ? (textarea.selectionEnd ?? value.length) : value.length;
+    const next = `${value.slice(0, start)}${variable}${value.slice(end)}`;
+    setValue(next);
+    requestAnimationFrame(() => {
+      textarea.focus();
+      const cursor = start + variable.length;
+      textarea.setSelectionRange(cursor, cursor);
+    });
+  }
+
+  async function submit() {
+    setSaving(true);
+    setError(null);
+    const result = await saveEbdAbsenceTemplateAction(value);
+    setSaving(false);
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+    onOpenChange(false);
+    router.refresh();
+  }
+
+  const preview = buildAbsenceMessage(value || "", {
+    ...PREVIEW_VARS,
+    churchName: churchName || PREVIEW_VARS.churchName,
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Modelo de mensagem</DialogTitle>
+          <DialogDescription>
+            Personalize o texto usado no botão Avisar do WhatsApp. Os campos entre
+            chaves são substituídos automaticamente.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Textarea
+              ref={textareaRef}
+              value={value}
+              onChange={(event) => setValue(event.target.value)}
+              rows={5}
+              maxLength={600}
+              placeholder="Escreva a mensagem de acompanhamento..."
+              className="min-h-28 resize-y"
+            />
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-xs text-muted-foreground">Inserir:</span>
+              {ABSENCE_TEMPLATE_VARIABLES.map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => insertVariable(item.key)}
+                  title={item.label}
+                  className="rounded-full border border-border/70 bg-muted/50 px-2 py-0.5 font-mono text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+                >
+                  {item.key}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => setValue(DEFAULT_ABSENCE_TEMPLATE)}
+                className="ml-auto text-[11px] font-medium text-muted-foreground underline-offset-2 hover:text-primary hover:underline"
+              >
+                Restaurar padrão
+              </button>
+            </div>
+            <p className="text-right text-[11px] text-muted-foreground tabular-nums">
+              {value.length}/600
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <span className="text-xs font-medium text-muted-foreground">
+              Pré-visualização
+            </span>
+            <div className="rounded-xl border border-emerald-200/70 bg-emerald-50/60 p-3 text-sm whitespace-pre-wrap text-emerald-900 dark:border-emerald-500/25 dark:bg-emerald-500/10 dark:text-emerald-100">
+              {preview || "Escreva a mensagem para visualizar."}
+            </div>
+          </div>
+
+          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+        </div>
+
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={saving}
+          >
+            Cancelar
+          </Button>
+          <Button type="button" onClick={submit} disabled={saving || !value.trim()}>
+            {saving ? <Loader2 className="mr-1.5 size-4 animate-spin" /> : null}
+            Salvar modelo
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

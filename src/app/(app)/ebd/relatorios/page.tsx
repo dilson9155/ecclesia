@@ -1,4 +1,4 @@
-import { requirePermission } from "@/lib/rbac";
+import { requirePermission, can } from "@/lib/rbac";
 import { ebdScopeFromUser } from "@/lib/ebd-scope";
 import { listClasses } from "@/services/ebd.service";
 import {
@@ -8,6 +8,7 @@ import {
   getRanking,
   listQuarters,
 } from "@/services/ebd-lessons.service";
+import { getEbdMessageSettings } from "@/services/ebd-settings.service";
 import {
   ReportsManager,
   type EbdReportTab,
@@ -70,6 +71,10 @@ export default async function EbdReportsPage({ searchParams }: Props) {
         })
       : undefined;
 
+  const messageSettings =
+    tab === "frequencia" ? await getEbdMessageSettings(user.churchId) : null;
+  const canManage = await can(user, "ebd.manage");
+
   const ranking =
     tab === "ranking"
       ? await getRanking(scope, {
@@ -96,6 +101,9 @@ export default async function EbdReportsPage({ searchParams }: Props) {
       classes={classes}
       performance={performance}
       attendance={attendance}
+      messageTemplate={messageSettings?.template}
+      churchName={messageSettings?.churchName}
+      canManageMessages={canManage}
       ranking={ranking}
       birthdays={birthdays}
       canExport

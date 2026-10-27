@@ -58,6 +58,7 @@ export type EbdAttendanceEntryView = {
   studentId: string;
   studentName: string;
   studentCode: string;
+  phone: string | null;
   present: boolean;
   lessonScore: number;
   participationScore: number;
@@ -588,7 +589,11 @@ export async function getAttendance(
       ...attendanceInclude,
       entries: {
         include: {
-          student: { include: { member: { select: { name: true, code: true } } } },
+          student: {
+            include: {
+              member: { select: { name: true, code: true, phone: true, whatsapp: true } },
+            },
+          },
         },
       },
     },
@@ -604,6 +609,7 @@ export async function getAttendance(
         studentId: entry.studentId,
         studentName: entry.student.member.name,
         studentCode: entry.student.member.code,
+        phone: entry.student.member.phone ?? entry.student.member.whatsapp ?? null,
         present: entry.present,
         lessonScore: entry.lessonScore,
         participationScore: entry.participationScore,
@@ -625,6 +631,7 @@ export async function getAttendanceRoster(
     studentId: string;
     name: string;
     code: string;
+    phone: string | null;
     present: boolean;
     lessonScore: number;
     participationScore: number;
@@ -649,7 +656,9 @@ export async function getAttendanceRoster(
 
   const students = await prisma.ebdStudent.findMany({
     where: { classId: lesson.classId, active: true },
-    include: { member: { select: { name: true, code: true } } },
+    include: {
+      member: { select: { name: true, code: true, phone: true, whatsapp: true } },
+    },
     orderBy: { member: { name: "asc" } },
   });
 
@@ -672,6 +681,7 @@ export async function getAttendanceRoster(
       studentId: student.id,
       name: student.member.name,
       code: student.member.code,
+      phone: student.member.phone ?? student.member.whatsapp ?? null,
       present: false,
       lessonScore: 0,
       participationScore: 0,

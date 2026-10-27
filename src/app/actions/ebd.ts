@@ -36,6 +36,7 @@ import {
   type EbdAttendanceEntryInput,
   type EbdLessonView,
 } from "@/services/ebd-lessons.service";
+import { saveEbdAbsenceTemplate } from "@/services/ebd-settings.service";
 
 type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -94,6 +95,28 @@ export async function updateEbdClass(id: string, input: EbdClassInput) {
 
 export async function deleteEbdClass(id: string) {
   return run("ebd.manage", (scope, userId) => deleteClass(scope, id, userId));
+}
+
+/* -------------------------------------------------------------------------- */
+/* Mensagens de acompanhamento                                                 */
+/* -------------------------------------------------------------------------- */
+
+export async function saveEbdAbsenceTemplateAction(
+  template: string
+): Promise<ActionResult> {
+  const user = await requirePermission("ebd.manage");
+  if (!user.churchId) {
+    return { ok: false, error: "Nenhuma igreja vinculada ao seu usuário." };
+  }
+
+  try {
+    await saveEbdAbsenceTemplate(user.churchId, template);
+  } catch (error) {
+    return { ok: false, error: (error as Error).message };
+  }
+
+  revalidateEbd();
+  return { ok: true };
 }
 
 /* -------------------------------------------------------------------------- */
@@ -257,6 +280,7 @@ export type EbdRosterResult =
         studentId: string;
         name: string;
         code: string;
+        phone: string | null;
         present: boolean;
         lessonScore: number;
         participationScore: number;
