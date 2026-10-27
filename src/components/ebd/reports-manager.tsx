@@ -82,7 +82,7 @@ export function ReportsManager({
     router.push(`/ebd/relatorios?${params.toString()}`);
   }
 
-  const pdfUrl = useMemo(() => {
+  const { pdfUrl, pdfDownloadUrl } = useMemo(() => {
     const params = new URLSearchParams();
     if (quarterId) params.set("quarterId", quarterId);
     if (classId) params.set("classId", classId);
@@ -93,7 +93,12 @@ export function ReportsManager({
         : tab === "ranking"
           ? "/api/ebd/relatorios/ranking"
           : "/api/ebd/relatorios/aniversariantes";
-    return `${base}?${params.toString()}`;
+    const query = params.toString();
+    const inline = query ? `${base}?${query}` : base;
+    return {
+      pdfUrl: inline,
+      pdfDownloadUrl: `${inline}${query ? "&" : "?"}download=1`,
+    };
   }, [tab, quarterId, classId, month]);
 
   const subtitle =
@@ -184,20 +189,17 @@ export function ReportsManager({
 
         {canExport ? (
           <div className="flex shrink-0 flex-wrap gap-2">
-            <Button
-              variant="outline"
-              onClick={() => window.open(pdfUrl, "_blank", "noopener,noreferrer")}
-            >
-              <Printer className="mr-1.5 size-4" />
-              Imprimir
+            <Button asChild variant="outline">
+              <a href={pdfUrl} target="_blank" rel="noreferrer">
+                <Printer className="mr-1.5 size-4" />
+                Imprimir
+              </a>
             </Button>
-            <Button
-              onClick={() => {
-                window.open(`${pdfUrl}&download=1`, "_blank", "noopener,noreferrer");
-              }}
-            >
-              <Download className="mr-1.5 size-4" />
-              Baixar PDF
+            <Button asChild>
+              <a href={pdfDownloadUrl} download>
+                <Download className="mr-1.5 size-4" />
+                Baixar PDF
+              </a>
             </Button>
           </div>
         ) : null}
