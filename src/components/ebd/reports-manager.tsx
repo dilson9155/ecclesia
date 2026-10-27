@@ -8,6 +8,7 @@ import {
   CalendarCheck,
   Download,
   FileText,
+  MessageCircle,
   Printer,
   Trophy,
 } from "lucide-react";
@@ -15,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { SELECT_INPUT_CLASS } from "@/lib/styles";
 import type {
   EbdAttendanceReport,
+  EbdAttendanceReportRow,
   EbdBirthdayRow,
   EbdPerformanceReport,
   EbdQuarterView,
@@ -255,6 +257,34 @@ export function ReportsManager({
   );
 }
 
+function formatIsoDate(value: string | null) {
+  if (!value) return "";
+  const [year, month, day] = value.split("-");
+  return `${day}/${month}/${year}`;
+}
+
+function whatsappLink(phone: string, message: string) {
+  const digits = phone.replace(/\D/g, "");
+  const withCountry = digits.length <= 11 ? `55${digits}` : digits;
+  return `https://wa.me/${withCountry}?text=${encodeURIComponent(message)}`;
+}
+
+function absenceMessage(row: EbdAttendanceReportRow) {
+  const firstName = row.name.split(" ")[0];
+  const lastAbsence = formatIsoDate(row.lastAbsence);
+  const faltas = row.absences === 1 ? "1 falta" : `${row.absences} faltas`;
+
+  if (row.consecutiveAbsences >= 2) {
+    return `Olá, ${firstName}! Sentimos sua falta nas últimas aulas da EBD (última em ${lastAbsence}). Esperamos você no próximo encontro. Deus abençoe!`;
+  }
+
+  if (row.consecutiveAbsences === 1) {
+    return `Olá, ${firstName}! Sentimos sua falta na EBD do dia ${lastAbsence}. Esperamos você na próxima aula. Deus abençoe!`;
+  }
+
+  return `Olá, ${firstName}! Tudo bem? Notamos ${faltas} na EBD neste trimestre. Conte com a gente e esperamos você na próxima aula. Deus abençoe!`;
+}
+
 function AttendanceTable({ report }: { report: EbdAttendanceReport }) {
   const atRisk = report.rows.filter((row) => row.percent < 75).length;
   const totalAbsences = report.rows.reduce((sum, row) => sum + row.absences, 0);
@@ -271,7 +301,7 @@ function AttendanceTable({ report }: { report: EbdAttendanceReport }) {
         <EmptyState message="Nenhuma chamada registrada para os filtros selecionados." />
       ) : (
         <div className="ebd-table-shell">
-          <table className="ebd-table min-w-[520px] lg:min-w-[820px]">
+          <table className="ebd-table min-w-[600px] lg:min-w-[900px]">
             <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
               <tr>
                 <th className="px-3 py-2 font-medium">Aluno</th>
@@ -282,6 +312,7 @@ function AttendanceTable({ report }: { report: EbdAttendanceReport }) {
                 <th className="px-3 py-2 text-right font-medium">Faltas</th>
                 <th className="px-3 py-2 text-right font-medium">Frequência</th>
                 <th className="px-3 py-2 font-medium">Situação</th>
+                <th className="px-3 py-2 text-right font-medium">Aviso</th>
               </tr>
             </thead>
             <tbody>
@@ -331,6 +362,24 @@ function AttendanceTable({ report }: { report: EbdAttendanceReport }) {
                           : "Crítico"}
                     </span>
                   </td>
+                  <td className="px-3 py-2 text-right">
+                    {row.phone && row.absences > 0 ? (
+                      <a
+                        href={whatsappLink(row.phone, absenceMessage(row))}
+                        target="_blank"
+                        rel="noreferrer"
+                        title={`Enviar mensagem para ${row.phone}`}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-emerald-200/80 px-2 py-1 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-50 dark:border-emerald-500/25 dark:text-emerald-300 dark:hover:bg-emerald-500/10"
+                      >
+                        <MessageCircle className="size-3.5" />
+                        Avisar
+                      </a>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">
+                        {row.phone ? "—" : "Sem telefone"}
+                      </span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -343,6 +392,11 @@ function AttendanceTable({ report }: { report: EbdAttendanceReport }) {
           acompanhamento.
         </p>
       ) : null}
+      <p className="text-xs text-muted-foreground">
+        O botão <strong className="font-medium text-foreground">Avisar</strong> abre o
+        WhatsApp com a mensagem de ausência já preenchida, usando o telefone cadastrado
+        do aluno.
+      </p>
     </div>
   );
 }
