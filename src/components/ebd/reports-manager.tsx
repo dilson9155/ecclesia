@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Download, FileText, Printer } from "lucide-react";
+import { BarChart3, Cake, Download, FileText, Printer, Trophy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SELECT_INPUT_CLASS } from "@/lib/styles";
 import type {
@@ -44,10 +44,10 @@ type Props = {
   canExport: boolean;
 };
 
-const TABS: Array<{ key: EbdReportTab; label: string }> = [
-  { key: "boletim", label: "Boletim de Desempenho" },
-  { key: "ranking", label: "Ranking de Pontuação" },
-  { key: "aniversariantes", label: "Aniversariantes" },
+const TABS: Array<{ key: EbdReportTab; label: string; icon: typeof BarChart3 }> = [
+  { key: "boletim", label: "Boletim de Desempenho", icon: BarChart3 },
+  { key: "ranking", label: "Ranking de Pontuação", icon: Trophy },
+  { key: "aniversariantes", label: "Aniversariantes", icon: Cake },
 ];
 
 export function ReportsManager({
@@ -116,24 +116,34 @@ export function ReportsManager({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-1 rounded-lg border bg-muted/30 p-1">
-        {TABS.map((item) => (
-          <button
-            key={item.key}
-            type="button"
-            onClick={() => navigate({ tab: item.key })}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-              tab === item.key
-                ? "bg-background text-foreground shadow-sm ring-1 ring-foreground/10"
-                : "text-muted-foreground hover:bg-background/60 hover:text-foreground"
-            }`}
-          >
-            {item.label}
-          </button>
-        ))}
+      <div className="flex gap-1 overflow-x-auto rounded-xl border border-border/70 bg-card/80 p-1 shadow-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {TABS.map((item) => {
+          const Icon = item.icon;
+          const active = tab === item.key;
+          return (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => navigate({ tab: item.key })}
+              aria-current={active ? "page" : undefined}
+              className={`group inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-200 ${
+                active
+                  ? "bg-gradient-to-b from-primary to-primary/90 text-primary-foreground shadow-sm shadow-primary/25"
+                  : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+              }`}
+            >
+              <Icon
+                className={`size-4 transition-opacity ${
+                  active ? "opacity-100" : "opacity-60 group-hover:opacity-100"
+                }`}
+              />
+              {item.label}
+            </button>
+          );
+        })}
       </div>
 
-      <div className="flex flex-col gap-3 rounded-xl border bg-card p-4 lg:flex-row lg:items-end lg:justify-between">
+      <div className="ebd-panel flex flex-col gap-3 p-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:flex-wrap">
           {tab !== "aniversariantes" ? (
             <label className="space-y-1.5 sm:max-w-64">
@@ -241,17 +251,17 @@ function PerformanceTable({ report }: { report: EbdPerformanceReport }) {
       {report.rows.length === 0 ? (
         <EmptyState message="Nenhuma chamada registrada para os filtros selecionados." />
       ) : (
-        <div className="overflow-x-auto rounded-xl border">
-          <table className="w-full min-w-[820px] text-sm">
+        <div className="ebd-table-shell">
+          <table className="ebd-table min-w-[560px] lg:min-w-[820px]">
             <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
               <tr>
                 <th className="px-3 py-2 font-medium">Aluno</th>
-                <th className="px-3 py-2 font-medium">Matrícula</th>
-                <th className="px-3 py-2 font-medium">Classe</th>
-                <th className="px-3 py-2 text-right font-medium">Aulas</th>
+                <th className="hidden px-3 py-2 font-medium lg:table-cell">Matrícula</th>
+                <th className="hidden px-3 py-2 font-medium xl:table-cell">Classe</th>
+                <th className="hidden px-3 py-2 text-right font-medium xl:table-cell">Aulas</th>
                 <th className="px-3 py-2 text-right font-medium">Presenças</th>
                 <th className="px-3 py-2 text-right font-medium">Pontos</th>
-                <th className="px-3 py-2 text-right font-medium">Média</th>
+                <th className="hidden px-3 py-2 text-right font-medium xl:table-cell">Média</th>
                 <th className="px-3 py-2 text-right font-medium">%</th>
               </tr>
             </thead>
@@ -259,12 +269,12 @@ function PerformanceTable({ report }: { report: EbdPerformanceReport }) {
               {report.rows.map((row) => (
                 <tr key={row.studentId} className="border-t">
                   <td className="px-3 py-2 font-medium">{row.name}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{row.code}</td>
-                  <td className="px-3 py-2">{row.className}</td>
-                  <td className="px-3 py-2 text-right">{row.lessons}</td>
+                  <td className="hidden px-3 py-2 text-muted-foreground lg:table-cell">{row.code}</td>
+                  <td className="hidden px-3 py-2 xl:table-cell">{row.className}</td>
+                  <td className="hidden px-3 py-2 text-right xl:table-cell">{row.lessons}</td>
                   <td className="px-3 py-2 text-right">{row.presences}</td>
                   <td className="px-3 py-2 text-right">{row.totalScore}</td>
-                  <td className="px-3 py-2 text-right">{row.averageScore.toFixed(1)}</td>
+                  <td className="hidden px-3 py-2 text-right xl:table-cell">{row.averageScore.toFixed(1)}</td>
                   <td className="px-3 py-2 text-right font-medium">{row.percent}%</td>
                 </tr>
               ))}
@@ -281,14 +291,14 @@ function RankingTable({ rows }: { rows: EbdRankingRow[] }) {
     return <EmptyState message="Nenhuma pontuação registrada para os filtros selecionados." />;
   }
   return (
-    <div className="overflow-x-auto rounded-xl border">
-      <table className="w-full min-w-[720px] text-sm">
+    <div className="ebd-table-shell">
+      <table className="ebd-table min-w-[460px] lg:min-w-[720px]">
         <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
           <tr>
             <th className="px-3 py-2 font-medium">Posição</th>
             <th className="px-3 py-2 font-medium">Aluno</th>
-            <th className="px-3 py-2 font-medium">Classe</th>
-            <th className="px-3 py-2 text-right font-medium">Presenças</th>
+            <th className="hidden px-3 py-2 font-medium lg:table-cell">Classe</th>
+            <th className="hidden px-3 py-2 text-right font-medium lg:table-cell">Presenças</th>
             <th className="px-3 py-2 text-right font-medium">Pontos</th>
             <th className="px-3 py-2 text-right font-medium">Média</th>
           </tr>
@@ -314,8 +324,8 @@ function RankingTable({ rows }: { rows: EbdRankingRow[] }) {
                 )}
               </td>
               <td className="px-3 py-2 font-medium">{row.name}</td>
-              <td className="px-3 py-2">{row.className}</td>
-              <td className="px-3 py-2 text-right">{row.presences}</td>
+              <td className="hidden px-3 py-2 lg:table-cell">{row.className}</td>
+              <td className="hidden px-3 py-2 text-right lg:table-cell">{row.presences}</td>
               <td className="px-3 py-2 text-right font-semibold">{row.totalScore}</td>
               <td className="px-3 py-2 text-right">{row.averageScore.toFixed(1)}</td>
             </tr>
@@ -331,16 +341,16 @@ function BirthdaysTable({ rows }: { rows: EbdBirthdayRow[] }) {
     return <EmptyState message="Nenhum aniversariante encontrado para o mês selecionado." />;
   }
   return (
-    <div className="overflow-x-auto rounded-xl border">
-      <table className="w-full min-w-[720px] text-sm">
+    <div className="ebd-table-shell">
+      <table className="ebd-table min-w-[460px] lg:min-w-[720px]">
         <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
           <tr>
             <th className="px-3 py-2 font-medium">Dia</th>
             <th className="px-3 py-2 font-medium">Nome</th>
-            <th className="px-3 py-2 font-medium">Classe</th>
-            <th className="px-3 py-2 font-medium">Nascimento</th>
+            <th className="hidden px-3 py-2 font-medium lg:table-cell">Classe</th>
+            <th className="hidden px-3 py-2 font-medium xl:table-cell">Nascimento</th>
             <th className="px-3 py-2 text-right font-medium">Idade</th>
-            <th className="px-3 py-2 font-medium">Telefone</th>
+            <th className="hidden px-3 py-2 font-medium lg:table-cell">Telefone</th>
           </tr>
         </thead>
         <tbody>
@@ -350,12 +360,14 @@ function BirthdaysTable({ rows }: { rows: EbdBirthdayRow[] }) {
                 {String(row.day).padStart(2, "0")}
               </td>
               <td className="px-3 py-2 font-medium">{row.name}</td>
-              <td className="px-3 py-2">{row.className}</td>
-              <td className="px-3 py-2 text-muted-foreground">
+              <td className="hidden px-3 py-2 lg:table-cell">{row.className}</td>
+              <td className="hidden px-3 py-2 text-muted-foreground xl:table-cell">
                 {row.birthDate.split("-").reverse().join("/")}
               </td>
               <td className="px-3 py-2 text-right">{row.age}</td>
-              <td className="px-3 py-2 text-muted-foreground">{row.phone || "—"}</td>
+              <td className="hidden px-3 py-2 text-muted-foreground lg:table-cell">
+                {row.phone || "—"}
+              </td>
             </tr>
           ))}
         </tbody>
@@ -366,11 +378,15 @@ function BirthdaysTable({ rows }: { rows: EbdBirthdayRow[] }) {
 
 function Summary({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border bg-card px-4 py-3">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+    <div className="relative overflow-hidden rounded-xl border bg-card px-4 py-3 shadow-sm">
+      <span
+        aria-hidden
+        className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-primary/0 via-primary/50 to-primary/0"
+      />
+      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
         {label}
       </p>
-      <p className="mt-1 text-2xl font-semibold leading-none">{value}</p>
+      <p className="mt-1.5 text-2xl font-semibold leading-none tabular-nums">{value}</p>
     </div>
   );
 }

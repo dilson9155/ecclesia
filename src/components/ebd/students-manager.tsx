@@ -252,9 +252,9 @@ export function StudentsManager({
           <button
             type="button"
             onClick={() => openAdd("existing")}
-            className="group flex items-start gap-3 rounded-xl border bg-card p-4 text-left transition-colors hover:border-primary/40 hover:bg-muted/40"
+            className="group relative overflow-hidden rounded-xl border bg-card p-4 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md"
           >
-            <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-primary/15 transition-colors group-hover:bg-primary/15">
               <UserPlus className="size-4" />
             </span>
             <span>
@@ -268,9 +268,9 @@ export function StudentsManager({
           <button
             type="button"
             onClick={() => openAdd("new")}
-            className="group flex items-start gap-3 rounded-xl border bg-card p-4 text-left transition-colors hover:border-primary/40 hover:bg-muted/40"
+            className="group relative overflow-hidden rounded-xl border bg-card p-4 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md"
           >
-            <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
+            <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 ring-1 ring-emerald-500/15 transition-colors group-hover:bg-emerald-500/15 dark:text-emerald-300">
               <Users className="size-4" />
             </span>
             <span>
@@ -294,7 +294,7 @@ export function StudentsManager({
         </p>
       ) : null}
 
-      <div className="flex flex-col gap-2 sm:flex-row">
+      <div className="ebd-panel flex flex-col gap-2 p-3 sm:flex-row">
         <div className="relative flex-1 sm:max-w-xs">
           <Search className="pointer-events-none absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
           <Input
@@ -330,15 +330,15 @@ export function StudentsManager({
       {filtered.length === 0 ? (
         <EmptyState message="Nenhum aluno encontrado para os filtros selecionados." />
       ) : (
-        <div className="overflow-x-auto rounded-xl border">
-          <table className="w-full min-w-[900px] text-sm">
+        <div className="ebd-table-shell">
+          <table className="ebd-table min-w-[560px] lg:min-w-[900px]">
             <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
               <tr>
                 <th className="px-3 py-2 font-medium">Aluno</th>
                 <th className="px-3 py-2 font-medium">Classe</th>
-                <th className="px-3 py-2 font-medium">Congregação</th>
-                <th className="px-3 py-2 font-medium">Nascimento</th>
-                <th className="px-3 py-2 font-medium">Telefone</th>
+                <th className="hidden px-3 py-2 font-medium lg:table-cell">Congregação</th>
+                <th className="hidden px-3 py-2 font-medium xl:table-cell">Nascimento</th>
+                <th className="hidden px-3 py-2 font-medium xl:table-cell">Telefone</th>
                 <th className="px-3 py-2 font-medium">Status</th>
                 {canManage ? <th className="px-3 py-2 text-right font-medium">Ações</th> : null}
               </tr>
@@ -353,13 +353,13 @@ export function StudentsManager({
                     </p>
                   </td>
                   <td className="px-3 py-2">{student.className}</td>
-                  <td className="px-3 py-2 text-muted-foreground">
+                  <td className="hidden px-3 py-2 text-muted-foreground lg:table-cell">
                     {student.congregationName}
                   </td>
-                  <td className="px-3 py-2 text-muted-foreground">
+                  <td className="hidden px-3 py-2 text-muted-foreground xl:table-cell">
                     {formatDate(student.birthDate)}
                   </td>
-                  <td className="px-3 py-2 text-muted-foreground">
+                  <td className="hidden px-3 py-2 text-muted-foreground xl:table-cell">
                     {student.phone || "—"}
                   </td>
                   <td className="px-3 py-2">

@@ -268,10 +268,10 @@ export function LessonsManager({ quarters, lessons, classes, canManage, canAtten
   return (
     <div className="space-y-5">
       {/* Trimestres */}
-      <section className="space-y-3 rounded-xl border bg-card p-4">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div className="flex flex-1 flex-col gap-2 sm:flex-row sm:items-end">
-            <Field label="Trimestre" className="sm:max-w-sm">
+      <section className="ebd-panel space-y-3 p-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div className="flex flex-1 flex-col gap-3 lg:flex-row lg:items-end">
+            <Field label="Trimestre" className="w-full sm:max-w-sm">
               <select
                 value={quarterFilter}
                 onChange={(event) => setQuarterFilter(event.target.value)}
@@ -352,7 +352,7 @@ export function LessonsManager({ quarters, lessons, classes, canManage, canAtten
 
       {/* Lições */}
       <section className="space-y-3">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="ebd-panel flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-1 flex-col gap-2 sm:flex-row">
             <div className="relative sm:max-w-xs">
               <Search className="pointer-events-none absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
@@ -397,16 +397,16 @@ export function LessonsManager({ quarters, lessons, classes, canManage, canAtten
         {filteredLessons.length === 0 ? (
           <EmptyState message="Nenhuma lição encontrada. Cadastre a primeira lição do trimestre." />
         ) : (
-          <div className="overflow-x-auto rounded-xl border">
-            <table className="w-full min-w-[900px] text-sm">
+          <div className="ebd-table-shell">
+            <table className="ebd-table min-w-[640px] lg:min-w-[900px]">
               <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
                 <tr>
                   <th className="px-3 py-2 font-medium">Nº</th>
                   <th className="px-3 py-2 font-medium">Lição</th>
                   <th className="px-3 py-2 font-medium">Classe</th>
-                  <th className="px-3 py-2 font-medium">Trimestre</th>
+                  <th className="hidden px-3 py-2 font-medium xl:table-cell">Trimestre</th>
                   <th className="px-3 py-2 font-medium">Data</th>
-                  <th className="px-3 py-2 font-medium">Chamadas</th>
+                  <th className="hidden px-3 py-2 font-medium lg:table-cell">Chamadas</th>
                   <th className="px-3 py-2 text-right font-medium">Ações</th>
                 </tr>
               </thead>
@@ -423,13 +423,13 @@ export function LessonsManager({ quarters, lessons, classes, canManage, canAtten
                       ) : null}
                     </td>
                     <td className="px-3 py-2">{lesson.className}</td>
-                    <td className="px-3 py-2 text-muted-foreground">
+                    <td className="hidden px-3 py-2 text-muted-foreground xl:table-cell">
                       {lesson.quarterName}
                     </td>
                     <td className="px-3 py-2 text-muted-foreground">
                       {formatDate(lesson.date)}
                     </td>
-                    <td className="px-3 py-2 text-muted-foreground">
+                    <td className="hidden px-3 py-2 text-muted-foreground lg:table-cell">
                       {lesson.attendanceCount}
                     </td>
                     <td className="px-3 py-2">

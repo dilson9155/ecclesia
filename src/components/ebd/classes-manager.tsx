@@ -133,7 +133,7 @@ export function ClassesManager({ classes, congregations, canManage }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="ebd-panel flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-1 flex-col gap-2 sm:flex-row">
           <div className="relative sm:max-w-xs">
             <Search className="pointer-events-none absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
@@ -171,16 +171,16 @@ export function ClassesManager({ classes, congregations, canManage }: Props) {
       {filtered.length === 0 ? (
         <EmptyState message="Nenhuma classe encontrada. Cadastre a primeira classe da EBD." />
       ) : (
-        <div className="overflow-x-auto rounded-xl border">
-          <table className="w-full min-w-[860px] text-sm">
+        <div className="ebd-table-shell">
+          <table className="ebd-table min-w-[620px] lg:min-w-[860px]">
             <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
               <tr>
                 <th className="px-3 py-2 font-medium">Classe</th>
                 <th className="px-3 py-2 font-medium">Congregação</th>
-                <th className="px-3 py-2 font-medium">Faixa etária</th>
+                <th className="hidden px-3 py-2 font-medium lg:table-cell">Faixa etária</th>
                 <th className="px-3 py-2 font-medium">Alunos</th>
-                <th className="px-3 py-2 font-medium">Professores</th>
-                <th className="px-3 py-2 font-medium">Lições</th>
+                <th className="hidden px-3 py-2 font-medium xl:table-cell">Professores</th>
+                <th className="hidden px-3 py-2 font-medium lg:table-cell">Lições</th>
                 <th className="px-3 py-2 font-medium">Status</th>
                 {canManage ? <th className="px-3 py-2 font-medium text-right">Ações</th> : null}
               </tr>
@@ -197,7 +197,9 @@ export function ClassesManager({ classes, congregations, canManage }: Props) {
                       ) : null}
                     </td>
                     <td className="px-3 py-2 text-muted-foreground">{item.congregationName}</td>
-                    <td className="px-3 py-2 text-muted-foreground">{item.ageRange || "—"}</td>
+                    <td className="hidden px-3 py-2 text-muted-foreground lg:table-cell">
+                      {item.ageRange || "—"}
+                    </td>
                     <td className="px-3 py-2">
                       <span className={full ? "font-medium text-amber-600" : ""}>
                         {item.activeStudentCount}/{item.maxStudents}
@@ -208,12 +210,14 @@ export function ClassesManager({ classes, congregations, canManage }: Props) {
                         </span>
                       ) : null}
                     </td>
-                    <td className="px-3 py-2 text-muted-foreground">
+                    <td className="hidden px-3 py-2 text-muted-foreground xl:table-cell">
                       {item.teachers.length > 0
                         ? item.teachers.map((teacher) => teacher.name).join(", ")
                         : "—"}
                     </td>
-                    <td className="px-3 py-2 text-muted-foreground">{item.lessonCount}</td>
+                    <td className="hidden px-3 py-2 text-muted-foreground lg:table-cell">
+                      {item.lessonCount}
+                    </td>
                     <td className="px-3 py-2">
                       <StatusPill active={item.status === "ATIVO"} />
                     </td>

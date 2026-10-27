@@ -167,7 +167,7 @@ export function TeachersManager({ teachers, classes, members, canManage }: Props
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="ebd-panel flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-1 flex-col gap-2 sm:flex-row">
           <div className="relative sm:max-w-xs">
             <Search className="pointer-events-none absolute left-2.5 top-2.5 size-4 text-muted-foreground" />
@@ -217,13 +217,13 @@ export function TeachersManager({ teachers, classes, members, canManage }: Props
       {filtered.length === 0 ? (
         <EmptyState message="Nenhum professor encontrado para os filtros selecionados." />
       ) : (
-        <div className="overflow-x-auto rounded-xl border">
-          <table className="w-full min-w-[780px] text-sm">
+        <div className="ebd-table-shell">
+          <table className="ebd-table min-w-[520px] lg:min-w-[780px]">
             <thead className="bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
               <tr>
                 <th className="px-3 py-2 font-medium">Professor</th>
                 <th className="px-3 py-2 font-medium">Classes com autonomia</th>
-                <th className="px-3 py-2 font-medium">Telefone</th>
+                <th className="hidden px-3 py-2 font-medium lg:table-cell">Telefone</th>
                 <th className="px-3 py-2 font-medium">Status</th>
                 {canManage ? <th className="px-3 py-2 text-right font-medium">Ações</th> : null}
               </tr>
@@ -251,7 +251,9 @@ export function TeachersManager({ teachers, classes, members, canManage }: Props
                       <span className="text-muted-foreground">—</span>
                     )}
                   </td>
-                  <td className="px-3 py-2 text-muted-foreground">{teacher.phone || "—"}</td>
+                  <td className="hidden px-3 py-2 text-muted-foreground lg:table-cell">
+                    {teacher.phone || "—"}
+                  </td>
                   <td className="px-3 py-2">
                     <StatusPill active={teacher.active} />
                   </td>

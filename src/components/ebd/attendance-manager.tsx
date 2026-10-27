@@ -901,10 +901,10 @@ export function AttendanceManager({
                       <div
                         key={entry.studentId}
                         className={cn(
-                          "rounded-xl border px-3 py-2.5 transition",
+                          "rounded-xl border px-3 py-2 transition-colors",
                           entry.present
-                            ? "border-emerald-200/80 bg-emerald-50/40 dark:border-emerald-500/20 dark:bg-emerald-500/5"
-                            : "bg-card"
+                            ? "border-emerald-200/80 bg-emerald-50/40 hover:border-emerald-300 dark:border-emerald-500/20 dark:bg-emerald-500/5"
+                            : "bg-card hover:border-primary/20 hover:bg-muted/30"
                         )}
                       >
                         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
